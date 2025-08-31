@@ -255,6 +255,7 @@ SET_ITERATOR set_iterator_init(SET set)
     while (pos < set->capacity)
     {
         if (HAS_VALUE(set->buffer, pos)) break;
+        pos++;
     }
     iter->idx = pos;
     return iter;
@@ -276,10 +277,11 @@ void *set_iterator_next(SET_ITERATOR iterator)
     void *data = set->buffer[iterator->idx];
 
     // find the index of the next elem or the end of the set
-    size_t pos = iterator->idx;
+    size_t pos = iterator->idx + 1;
     while (pos < set->capacity)
     {
         if (HAS_VALUE(set->buffer, pos)) break;
+        ++pos;
     }
     iterator->idx = pos; 
 

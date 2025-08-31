@@ -91,7 +91,7 @@ SET set_intersection(SET A, SET B);
  * 
  * @param set the set to iterate
  * @return an iterator for the elements in the set
- * @warning the iterator (and any copies) is invalidated the moment the set is modified in anyway
+ * @warning the iterator (and any copies) is invalidated the moment the set is modified in anyway or destroyed
  */
 SET_ITERATOR set_iterator_init(SET set);
 
@@ -109,7 +109,7 @@ void set_iterator_fini(SET_ITERATOR iterator);
  * 
  * @param iterator the iterator to determine if there is a next value
  * @return nonzero if there is a next value; otherwise zero.
- * @warning the iterator (and any copies) is invalidated the moment the set is modified in anyway
+ * @warning the iterator (and any copies) is invalidated the moment the set is modified in anyway or destroyed
  */
 int set_iterator_has_next(SET_ITERATOR iterator);
 
@@ -118,7 +118,7 @@ int set_iterator_has_next(SET_ITERATOR iterator);
  * 
  * @param iterator the iterator to determine if there is a next value
  * @return the next pointer in the set from the iterator
- * @warning the iterator (and any copies) is invalidated the moment the set is modified in anyway
+ * @warning the iterator (and any copies) is invalidated the moment the set is modified in anyway or destroyed
  */
 void *set_iterator_next(SET_ITERATOR iterator);
 
