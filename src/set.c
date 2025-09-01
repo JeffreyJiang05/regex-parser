@@ -10,7 +10,7 @@
 
 #define SET_LOADFACTOR 0.5
 
-#define REACHED_THRESHOLD(set) ((set)->capacity * SET_LOADFACTOR == (set)->size)
+#define REACHED_THRESHOLD(set) ((size_t) ((set)->capacity * SET_LOADFACTOR) == (set)->size)
 
 // magic number for the tombstone. should be 0xFFFFFF
 #define TOMBSTONE ((void*) -1)
@@ -46,7 +46,7 @@ SET set_init()
     set->capacity = DEFAULT_SET_CAPACITY;
     set->size = 0;
     set->buffer = calloc(set->capacity, sizeof(void*));  
-    info("Set [%p] initialized.", set);
+    info("Set[%p] initialized.", set);
     return set; 
 }
 
@@ -76,14 +76,14 @@ int set_contains(SET set, void *ptr)
         // if we run into a NULL ptr, then the set does not contain the ptr
         if (!set->buffer[pos]) 
         {
-            info("Pointer %p is not in Set[%p].", ptr, set);
+            info("\tPointer %p is not in Set[%p].", ptr, set);
             return 0;
         }
 
         // return nonzero if the ptr is found in the set 
         if (set->buffer[pos] == ptr) 
         {
-            info("Pointer %p is in Set[%p].", ptr, set);
+            info("\tPointer %p is in Set[%p].", ptr, set);
             return 1; 
         }
 
@@ -95,7 +95,7 @@ int set_contains(SET set, void *ptr)
         // in the set
         if (pos == init_pos) 
         {
-            info("Pointer %p is not in Set[%p].", ptr, set);
+            info("\tPointer %p is not in Set[%p].", ptr, set);
             return 0;
         }
     }
@@ -249,6 +249,8 @@ SET set_intersection(SET A, SET B)
 
 SET_ITERATOR set_iterator_init(SET set)
 {
+    if (!set) return NULL;
+
     SET_ITERATOR iter = malloc(sizeof(SET_ITERATOR));
     iter->set = set; 
     size_t pos = 0;

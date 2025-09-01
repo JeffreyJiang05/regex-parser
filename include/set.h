@@ -10,7 +10,7 @@ typedef struct set_iterator * SET_ITERATOR;
  * initializes an empty set of pointers. 
  * all sets initialized via this function should be destroyed using `set_fini`
  * 
- * @return newly created set 
+ * @return newly created map set 
  */
 SET set_init();
 

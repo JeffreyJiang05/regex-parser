@@ -14,7 +14,7 @@ typedef union
 #define PTR(value) ((CVT){(value)}.ptr)
 #define INT(ptrval) ((CVT){.ptr=(ptrval)}.val)
 
-Test(hash_set_tests, set_lifecycle, .timeout = 5)
+Test(set_tests, set_lifecycle, .timeout = 5)
 {
     SET set = NULL;
     
@@ -25,7 +25,7 @@ Test(hash_set_tests, set_lifecycle, .timeout = 5)
     set_fini(set);
 }
 
-Test(hash_set_tests, simple_set_add, .timeout = 5)
+Test(set_tests, set_add_simple, .timeout = 5)
 {
     SET set = set_init();
     int ret;
@@ -47,7 +47,7 @@ Test(hash_set_tests, simple_set_add, .timeout = 5)
 }
 
 #define SET_ADD_REHASH_TRIALS 128
-Test(hash_set_tests, set_add_rehash, .timeout = 5)
+Test(set_tests, set_add_rehash, .timeout = 5)
 {
     SET set = set_init();
     int ret;
@@ -61,7 +61,7 @@ Test(hash_set_tests, set_add_rehash, .timeout = 5)
 }
 #undef SET_ADD_REHASH_TRIALS
 
-Test(hash_set_tests, set_contains_simple, .timeout = 5)
+Test(set_tests, set_contains_simple, .timeout = 5)
 {
     SET set = set_init();
     int ret;
@@ -77,7 +77,7 @@ Test(hash_set_tests, set_contains_simple, .timeout = 5)
     set_fini(set);
 }
 
-Test(hash_set_tests, set_contains_random, .timeout = 5)
+Test(set_tests, set_contains_random, .timeout = 5)
 {
     unsigned seed = 22;
     size_t max_ptr_value = 64;
@@ -103,7 +103,7 @@ Test(hash_set_tests, set_contains_random, .timeout = 5)
 
 // 64K trials
 #define SET_ADD_RANDOM_TRIALS (1 << 16)
-Test(hash_set_tests, set_add_random, .timeout = 5)
+Test(set_tests, set_add_random, .timeout = 5)
 {
     unsigned seed = 22;
 
@@ -126,7 +126,7 @@ Test(hash_set_tests, set_add_random, .timeout = 5)
 #undef SET_ADD_RANDOM_TRIALS
 
 #define SET_SIZE_RANDOM_TRIALS (1 << 4)
-Test(hash_set_tests, set_size_random, .timeout = 5)
+Test(set_tests, set_size_random, .timeout = 5)
 {
     unsigned seed = 22;
     unsigned max_size = 256;
@@ -149,7 +149,7 @@ Test(hash_set_tests, set_size_random, .timeout = 5)
     }
 }
 
-Test(hash_set_tests, set_remove_simple, .timeout = 5)
+Test(set_tests, set_remove_simple, .timeout = 5)
 {
     unsigned max_size = 256;
     int ret;
@@ -169,7 +169,7 @@ Test(hash_set_tests, set_remove_simple, .timeout = 5)
 
 // be careful not to set this value too high, this test case runs O(N^2) where N is number of trials
 #define SET_REMOVE_RANDOM_TRIAL (1 << 7)
-Test(hash_set_tests, set_remove_random, .timeout = 5)
+Test(set_tests, set_remove_random, .timeout = 5)
 {
     unsigned seed = 22;
 
@@ -219,7 +219,7 @@ Test(hash_set_tests, set_remove_random, .timeout = 5)
 }
 
 #define SET_CLEAR_RANDOM_TRIALS 16
-Test(hash_set_tests, set_clear_random, .timeout = 5)
+Test(set_tests, set_clear_random, .timeout = 5)
 {
     int seed = 22;
     size_t ret = 0;
@@ -241,7 +241,7 @@ Test(hash_set_tests, set_clear_random, .timeout = 5)
     set_fini(set);
 }
 
-Test(hash_set_tests, set_iterator_lifetime, .timeout = 5)
+Test(set_tests, set_iterator_lifetime, .timeout = 5)
 {
     SET set = set_init();
     SET_ITERATOR iter = set_iterator_init(set);
@@ -250,7 +250,7 @@ Test(hash_set_tests, set_iterator_lifetime, .timeout = 5)
 }
 
 #define SET_ITERATOR_SIMPLE_TEST_SIZE (1 << 8)
-Test(hash_set_tests, set_iterator_simple, .timeout = 5)
+Test(set_tests, set_iterator_simple, .timeout = 5)
 {
     SET set = set_init();
     for (size_t i = 1; i < SET_ITERATOR_SIMPLE_TEST_SIZE; ++i) set_add(set, PTR(i));
