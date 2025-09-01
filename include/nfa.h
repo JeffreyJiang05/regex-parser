@@ -166,6 +166,48 @@ NFA nfa_new(NSTATE starting_state, NSTATE *accepting_states, size_t num_acceptin
 void nfa_free(NFA automaton);
 
 /**
+ * retrieves the starting state for the NFA
+ * 
+ * @param automaton the NFA to get the start state of
+ * @return the start state of `automaton`
+ */
+NSTATE nfa_get_starting_state(NFA automaton);
+
+/**
+ * retrieves a list of the accepting states for the NFA
+ * 
+ * @param automaton the NFA to get the accepting states of
+ * @return the dynamically allocated list of accepting states
+ * @warning this function returns dynamically allocated memory
+ */
+NSTATE *nfa_get_accepting_states(NFA automaton);
+
+/**
+ * retrieves the number of accepting states in the NFA
+ * 
+ * @param automaton the NFA to count the number of accepting states
+ * @return the number of accepting states
+ */
+size_t nfa_count_accepting_states(NFA automaton);
+
+/**
+ * retrieves a list of all the states in the NFA
+ * 
+ * @param automaton the NFA to get states of
+ * @return the dynamically allocated list of all the states in the automaton
+ * @warning this function returns dynamically allocated memory
+ */
+NSTATE *nfa_get_states(NFA automaton);
+
+/**
+ * retrieves the total number of states in the automaton
+ * 
+ * @param automaton the NFA to count all the states of
+ * @return the number of states in the NFA
+ */
+size_t nfa_count_states(NFA automaton);
+
+/**
  * prints the NFA in a debug friendly way
  * 
  * @param automaton the NFA to display

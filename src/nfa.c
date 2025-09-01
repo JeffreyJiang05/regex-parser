@@ -309,6 +309,31 @@ static void __nfa_release(NFA automaton)
     free(automaton);
 }
 
+NSTATE nfa_get_starting_state(NFA automaton)
+{
+    return automaton->starting_state;
+}
+
+NSTATE *nfa_get_accepting_states(NFA automaton)
+{
+    return (NSTATE*) set_values(automaton->accepting_states);
+}
+
+size_t nfa_count_accepting_states(NFA automaton)
+{
+    return set_size(automaton->accepting_states);
+}
+
+NSTATE *nfa_get_states(NFA automaton)
+{
+    return (NSTATE*) set_values(automaton->all_states);
+}
+
+size_t nfa_count_states(NFA automaton)
+{
+    return set_size(automaton->all_states);
+}
+
 void nfa_debug_display(NFA automaton)
 {
     SET_ITERATOR iter;
