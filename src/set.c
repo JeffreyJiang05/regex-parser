@@ -207,6 +207,17 @@ void set_clear(SET set)
     info("Cleared Set[%p].", set);
 }
 
+void **set_values(SET set)
+{
+    void **values = malloc(set->size * sizeof(void*));
+    size_t i = 0;
+    SET_ITERATOR iter = set_iterator_init(set);
+    while (set_iterator_has_next(iter))
+        values[i++] = set_iterator_next(iter);
+    set_iterator_fini(iter);
+    return values;
+}
+
 SET set_union(SET A, SET B)
 {
     SET set_union = set_init();

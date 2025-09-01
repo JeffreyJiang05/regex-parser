@@ -65,6 +65,16 @@ int set_remove(SET set, void *ptr);
 void set_clear(SET set);
 
 /**
+ * returns a list of the values stored in the set in no particular order. the
+ * size of this list is given by `set_size`
+ * 
+ * @param set the set to retrieve the values
+ * @returns a dynamically allocated list of values stored in the set
+ * @warning the list returned by this function is dynamically allocated and must be freed
+ */
+void **set_values(SET set);
+
+/**
  * creates a new set that is the union of the two sets
  * 
  * @param A the first set
