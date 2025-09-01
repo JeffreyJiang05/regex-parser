@@ -258,6 +258,24 @@ SET set_intersection(SET A, SET B)
     return set_intersection;
 }
 
+int is_subset(SET subset, SET superset)
+{
+    void *elem;
+    int is_subset = 1;
+    SET_ITERATOR iter = set_iterator_init(subset);
+    while (set_iterator_has_next(iter))
+    {
+        elem = set_iterator_next(iter);
+        if (!set_contains(superset, elem))
+        {
+            is_subset = 0;
+            break;
+        }
+    }
+    set_iterator_fini(iter);
+    return is_subset;
+}
+
 SET_ITERATOR set_iterator_init(SET set)
 {
     if (!set) return NULL;

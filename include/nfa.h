@@ -20,8 +20,9 @@ NSTATE nstate_new();
  * releases and destrpys an nondeterministc state
  * 
  * @param state the state to destroy
+ * @return zero on success; nonzero on failure
  */
-void nstate_free(NSTATE state);
+int nstate_free(NSTATE state);
 
 /**
  * creates a new deterministic state with a tag for debugging
@@ -65,15 +66,17 @@ int nstate_remove_transition(NSTATE from, SYMBOL sym, NSTATE to);
  * 
  * @param from the state the transitions start from
  * @param sym the symbol that causes the transitions to be removed
+ * @return zero on success; nonzero otherwise
  */
-void nstate_clear_transition_symbol(NSTATE from, SYMBOL sym);
+int nstate_clear_transition_symbol(NSTATE from, SYMBOL sym);
 
 /**
  * removes all transitions from a state
  * 
  * @param from the state whose transitions will be removed
+ * @return zero on success; nonzero otherwise
  */
-void nstate_clear_all_transitions(NSTATE from);
+int nstate_clear_all_transitions(NSTATE from);
 
 /**
  * retrieves a list of symbols which there is a non-trivial 
@@ -115,6 +118,14 @@ NSTATE *nstate_get_transitions(NSTATE state, SYMBOL sym);
  */
 size_t nstate_count_transitions(NSTATE state, SYMBOL sym);
 
+/**
+ * prints the NSTATE in a debug friendly way
+ * 
+ * @param state the state to display
+ * @param indent the number of indents for the display
+ */
+void nstate_debug_display(NSTATE state, size_t indent);
+
 // -------------------------------------------------------------------------------------- //
 
 typedef struct nondeterministic_finite_automaton * NFA;
@@ -122,10 +133,18 @@ typedef struct nondeterministic_finite_automaton * NFA;
 /**
  * creates a new nondeterministc finite automata (NFA)
  * 
+ * upon passing a state machine to NFA, all states connected to the starting state
+ * via transitions are under the control of the NFA. This means when the NFA is
+ * destroyed, the these states are also destroyed.  additionally, the state machine
+ * should not be modified using the primitive NSTATE functions. 
+ * 
+ * it is an error to pass in an accepting state in which there does not exist a path
+ * from the starting state to said accepting state.
+ * 
  * @param starting_state the starting state for the NFA
  * @param accepting_states a list of accepting states
  * @param num_accepting_states the number of accepting states
- * @return the newly created NFA
+ * @return the newly created NFA if valid, null on any error
  */
 NFA nfa_new(NSTATE starting_state, NSTATE *accepting_states, size_t num_accepting_states);
 
@@ -141,15 +160,11 @@ void nfa_free(NFA automaton);
  * 
  * @param automaton the NFA to display
  */
-void NFA_debug_display(NFA automaton);
+void nfa_debug_display(NFA automaton);
 
 // -------------------------------------------------------------------------------------- //
 
 typedef struct NFA_simulator * NFA_SIM;
-
-extern int SIM_SUCCESS;
-extern int SIM_FAILURE;
-extern int SIM_PENDING;
 
 typedef enum sim_status
 {

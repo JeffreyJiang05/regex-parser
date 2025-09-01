@@ -95,6 +95,15 @@ SET set_union(SET A, SET B);
 SET set_intersection(SET A, SET B);
 
 /**
+ * determines if the set is a subset of another set.
+ * 
+ * @param subset the set to determine if it is a subset
+ * @param superset the set to determine if it is a superset
+ * @return nonzero if is subset, zero otherwise. 
+ */
+int is_subset(SET subset, SET superset);
+
+/**
  * creates an iterator for a set
  * 
  * @note the order of the output from the iterator is not defined. it may not be like the order of insertion.
