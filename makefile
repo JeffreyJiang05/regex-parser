@@ -7,7 +7,7 @@ TEST := test/
 BUILD := build/
 BIN := bin/
 
-CFLAGS := -Wall -Werror
+CFLAGS := -Wall -Werror -Wno-unused-function
 DFLAGS := -g -DDEBUG -DCOLOR
 PRINT_STATEMENTS := -DERROR -DSUCCESS -DWARN -DINFO
 

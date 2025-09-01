@@ -106,7 +106,7 @@ size_t nstate_count_transition_symbols(NSTATE state);
  * @param sym the symbol 
  * @return the list of states reached via `sym` starting at `state`, NULL if none
  */
-NSTATE *nstate_get_transitions(NSTATE state, SYMBOL sym);
+NSTATE *nstate_get_transition_states(NSTATE state, SYMBOL sym);
 
 /**
  * counts the number of transitions with a given symbol starting
@@ -116,7 +116,17 @@ NSTATE *nstate_get_transitions(NSTATE state, SYMBOL sym);
  * @param sym the symbol 
  * @return the number of states reached via `sym` starting at `state`
  */
-size_t nstate_count_transitions(NSTATE state, SYMBOL sym);
+size_t nstate_count_transition_states(NSTATE state, SYMBOL sym);
+
+/**
+ * returns if there is a transition from one state to another on a symbol
+ * 
+ * @param from the state the transition beings
+ * @param sym the symbol the transition accepts
+ * @param to the state to transition end
+ * @return nonzero if the transition exists; zero otherwise
+ */
+int nstate_has_transition(NSTATE from, SYMBOL sym, NSTATE to);
 
 /**
  * prints the NSTATE in a debug friendly way
