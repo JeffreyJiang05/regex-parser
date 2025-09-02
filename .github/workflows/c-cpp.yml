@@ -14,10 +14,7 @@ jobs:
     - name: dependencies
       run: sudo apt install libcriterion-dev
     - name: make
-      run: make all
-  test:
-    runs-on: ubuntu-latest
-    steps:
+      run: make clean all
     - name: run_tests
       run: ./bin/regex_tests
 
