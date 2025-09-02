@@ -5,6 +5,7 @@
 
 #include "map.h"
 #include "set.h"
+#include "stack.h"
 
 const int EPSILON = -1;
 
@@ -25,6 +26,7 @@ struct nondeterministic_state
     // MAP_VALUE = SET<NSTATE>
     MAP transitions;
     int flags;
+    int nfa_id;
 };
 
 NSTATE nstate_new()
@@ -33,6 +35,7 @@ NSTATE nstate_new()
     state->debug_tag = NULL;
     state->transitions = map_init();
     state->flags = 0;
+    state->nfa_id = -1;
     return state;
 }
 
@@ -208,9 +211,10 @@ struct nondeterministic_finite_automaton
 };
 
 // O(n + m)
-static void aggregate_states(NSTATE state, SET state_set)
+static void aggregate_states(NSTATE state, SET state_set, int *uid_counter)
 {
     set_add(state_set, state);
+    state->nfa_id = (*uid_counter)++;
 
     void *data;
     SET transition_set;
@@ -227,7 +231,7 @@ static void aggregate_states(NSTATE state, SET state_set)
         {
             next_state = set_iterator_next(state_iter);
             if (!set_contains(state_set, next_state))
-                aggregate_states(next_state, state_set);
+                aggregate_states(next_state, state_set, uid_counter);
         }
         set_iterator_fini(state_iter);
     }
@@ -239,12 +243,14 @@ NFA nfa_new(NSTATE starting_state, NSTATE *accepting_states, size_t num_acceptin
 {
     if (!starting_state || !accepting_states || !num_accepting_states) return NULL;
 
+    int nfa_id = 0;
+
     SET accepting = set_init();
     for (size_t i = 0; i < num_accepting_states; ++i) 
         set_add(accepting, accepting_states[i]);
 
     SET all = set_init();
-    aggregate_states(starting_state, all);
+    aggregate_states(starting_state, all, &nfa_id);
 
     // invariant violated, error
     if (!is_subset(accepting, all))
@@ -367,4 +373,156 @@ void nfa_debug_display(NFA automaton)
         nstate_debug_display(state, 2);
     }
     set_iterator_fini(iter);
+}
+
+// -------------------------------------------------------------------------------------- //
+
+struct NFA_simulator
+{
+    NFA nfa;
+    STACK old_states;
+    STACK new_states;
+    unsigned char *already_on;
+};
+
+static void merge_sets(SET A, SET B)
+{
+    SET_ITERATOR iter = set_iterator_init(B);
+    void *state;
+    while (set_iterator_has_next(iter))
+    {   
+        state = set_iterator_next(iter);
+        set_add(A, state);
+    }
+    set_iterator_fini(iter);
+}
+
+static SET epsilon_closure_state(NSTATE state)
+{
+    return (SET) map_get(state->transitions, EPSILON);
+}
+
+static SET epsilon_closure_set(SET input)
+{
+    SET set = set_init();
+    NSTATE state;
+    SET_ITERATOR iter = set_iterator_init(input);
+    while (set_iterator_has_next(iter))
+    {
+        state = set_iterator_next(iter);
+        merge_sets(set, epsilon_closure_state(state));
+    }
+    set_iterator_fini(iter);
+    return set;
+}
+
+/**
+ * addState(s):
+ *      push s onto newStates
+ *      alreadyOn[s] = TRUE
+ *      for (t in move[s, epsilon]):
+ *          if (!alreadyOn[t])
+ *              addState(t)
+ */
+static void add_state(NFA_SIM sim, NSTATE state)
+{
+    stack_push(sim->new_states, state);
+    sim->already_on[state->nfa_id] = 1;
+
+    SET epsilon_transitions = map_get(state->transitions, EPSILON);
+    SET_ITERATOR iter = set_iterator_init(epsilon_transitions);
+    NSTATE t;
+    while (set_iterator_has_next(iter))
+    {
+        t = set_iterator_next(iter);
+        if (!sim->already_on[t->nfa_id])
+            add_state(sim, t);
+    }
+    set_iterator_fini(iter);
+}
+
+NFA_SIM nfa_sim_init(NFA automaton)
+{
+    NFA_SIM sim = malloc(sizeof(struct NFA_simulator));
+    sim->nfa = automaton;
+    sim->old_states = stack_init();
+    sim->new_states = stack_init();
+    size_t sz = set_size(automaton->all_states);
+    sim->already_on = calloc(sz, sizeof(unsigned char));
+
+    add_state(sim, automaton->starting_state);
+
+    return sim;
+}
+
+/**
+ * S = epsilon_closure_state(s_0)
+ * c = nextChar()
+ * 
+ * while (c != EOF)
+ * {
+ *      S = eta_closure_set(move(S, c))
+ *      c = nextChar()
+ * }
+ * 
+ * if (S INTERSECTION ACCEPTING_STATES != EMPTY)
+ *      return YES
+ * 
+ * return NO
+ */
+
+void nfa_sim_step(NFA_SIM sim, SYMBOL input_sym)
+{
+    void *data;
+    NSTATE state;
+    SET set;
+    SET_ITERATOR iter;
+
+    while (stack_size(sim->old_states) != 0)
+    {
+        stack_pop(sim->old_states, &data);
+        state = data;
+
+        set = map_get(state->transitions, input_sym);
+
+        iter = set_iterator_init(set);
+        while (set_iterator_has_next(iter))
+        {
+            state = set_iterator_next(iter);
+            if (!sim->already_on[state->nfa_id])
+                add_state(sim, state);
+        }
+        set_iterator_fini(iter);
+    }
+
+    while (stack_size(sim->new_states) != 0)
+    {
+        stack_pop(sim->new_states, &data);
+        state = data;
+        stack_push(sim->old_states, state);
+        sim->already_on[state->nfa_id] = 0;
+    }
+}
+
+SIM_STATUS nfa_sim_fini(NFA_SIM sim)
+{
+    SIM_STATUS status = SIM_FAILURE;
+
+    void *data;
+    while (stack_size(sim->old_states) != 0)
+    {
+        stack_pop(sim->old_states, &data);
+        if (set_contains(sim->nfa->accepting_states, data))
+        {
+            status = SIM_SUCCESS;
+            break;
+        }
+    }
+
+    stack_fini(sim->old_states);
+    stack_fini(sim->new_states);
+    free(sim->already_on);
+    free(sim);
+
+    return status;
 }

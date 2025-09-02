@@ -238,9 +238,8 @@ NFA_SIM nfa_sim_init(NFA automaton);
  * 
  * @param sim the simulator 
  * @param input_sym the input sym to progress the simulator
- * @return a simulation status
  */
-SIM_STATUS nfa_sim_step(NFA_SIM sim, SYMBOL input_sym);
+void nfa_sim_step(NFA_SIM sim, SYMBOL input_sym);
 
 /**
  * destroys the NFA simulator 
