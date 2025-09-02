@@ -8,14 +8,16 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
     - name: dependencies
       run: sudo apt install libcriterion-dev
     - name: make
       run: make all
+  test:
+    runs-on: ubuntu-latest
+    steps:
     - name: run_tests
-      run: ./bin/regex_tests --verbose
+      run: ./bin/regex_tests
+
