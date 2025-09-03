@@ -84,6 +84,7 @@ Test(nfa_tests, nfa_bad_accepting_states, .timeout = 5)
     nstate_free(D);
 }
 
+#ifdef NFA_STATE_LOCKING
 /**
  * Using the following automaton 
  *      _ [B]
@@ -146,6 +147,7 @@ Test(nfa_tests, nfa_nstate_locks, .timeout = 5)
 
     nfa_free(nfa);
 }
+#endif
 
 /**
  * Using the following automaton 

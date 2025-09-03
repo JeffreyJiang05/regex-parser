@@ -208,6 +208,47 @@ NSTATE *nfa_get_states(NFA automaton);
 size_t nfa_count_states(NFA automaton);
 
 /**
+ * the following API allows building an NFA using larger components
+ * instead of manually manipulating the transitions that is needed
+ * with the NSTATE API. 
+ * 
+ * these functions should be used to compose NFAs in which the structure
+ * of the NFA is unknown. thus, this allows for more abstract NFAs such
+ * as those with multiple accepting states
+ * 
+ * it is recommended to build NFAs using the regular_nfa component if it
+ * is done from scratch.
+ */
+
+NFA nfa_symbol(SYMBOL symbol);
+
+NFA nfa_concat(NFA a, NFA b);
+
+NFA nfa_union(NFA a, NFA b);
+
+NFA nfa_repeat(NFA a);
+
+// the following functions are used to determine if a string is accepted by an NFA
+
+/**
+ * determines if the automaton accepts the following string
+ * 
+ * @param automaton the NFA
+ * @param string the zero terminated string to check for acceptance
+ * @return true if the automaton accepts the string; false otherwise
+ */
+int nfa_accept(NFA automaton, SYMBOL *string);
+
+/**
+ * determines if the automaton accepts the following c-style string
+ * 
+ * @param automaton the NFA
+ * @param string the null terminated char string to check for acceptance
+ * @return true if the automaton accepts the string; false otherwise
+ */
+int nfa_accept_cstr(NFA automaton, char *string);
+
+/**
  * prints the NFA in a debug friendly way
  * 
  * @param automaton the NFA to display
@@ -221,8 +262,7 @@ typedef struct NFA_simulator * NFA_SIM;
 typedef enum sim_status
 {
     SIM_FAILURE = -1,
-    SIM_SUCCESS = 0,
-    SIM_PENDING = 1
+    SIM_SUCCESS = 0
 } SIM_STATUS;
 
 /**

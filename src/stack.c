@@ -2,6 +2,10 @@
 
 #include <string.h>
 
+#ifdef DEBUG
+    #undef DEBUG
+#endif
+
 #include "debug.h"
 
 #define DEFAULT_STACK_CAPACITY 8
@@ -25,9 +29,9 @@ STACK stack_init()
 
 void stack_fini(STACK stack)
 {
+    info("Destroyed Stack[%p].", stack);
     free(stack->buffer);
     free(stack);
-    info("Destroyed Stack[%p].", stack);
 }
 
 size_t stack_size(STACK stack)

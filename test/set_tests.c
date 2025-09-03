@@ -44,6 +44,8 @@ Test(set_tests, set_add_simple, .timeout = 5)
 
     ret = set_add(set, PTR(22));
     cr_assert( ret == 0, "Expected set_add to return zero. Got %d", ret );
+
+    set_fini(set);
 }
 
 #define SET_ADD_REHASH_TRIALS 128

@@ -1,5 +1,9 @@
 #include "set.h"
 
+#ifdef DEBUG
+    #undef DEBUG
+#endif
+
 #include "debug.h"
 
 #include <stdint.h>
@@ -280,7 +284,7 @@ SET_ITERATOR set_iterator_init(SET set)
 {
     if (!set) return NULL;
 
-    SET_ITERATOR iter = malloc(sizeof(SET_ITERATOR));
+    SET_ITERATOR iter = malloc(sizeof(struct set_iterator));
     iter->set = set; 
     size_t pos = 0;
     while (pos < set->capacity)

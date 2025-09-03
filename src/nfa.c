@@ -1,5 +1,7 @@
 #include "nfa.h"
 
+#include "debug.h"
+
 #include <stdio.h>
 #include <ctype.h>
 
@@ -8,6 +10,14 @@
 #include "stack.h"
 
 const int EPSILON = -1;
+
+/**
+ * NFA_STATE_LOCKING toggles if the states owned by an NFA should be locked so that they are immutable
+ * this is highly recommended for code that requires debugging
+ * 
+ * Note state locking can have performance costs with certain functions
+ */
+#ifdef NFA_STATE_LOCKING
 
 #define LOCK_STATE(state) do {      \
     (state)->flags |= 0x1;          \
@@ -18,6 +28,24 @@ const int EPSILON = -1;
 } while(0)
 
 #define IS_STATE_LOCKED(state) ((state)->flags & 0x1)
+
+#define UNLOCK_STATES(nfa) __nfa_unlock_all(nfa)
+
+#define DESTROY_NFA(nfa) __nfa_destroy(nfa)
+
+#else
+
+#define LOCK_STATE(state) do {} while(0)
+
+#define UNLOCK_STATE(state) do {} while (0)
+
+#define IS_STATE_LOCKED(state) (0)
+
+#define UNLOCK_STATES(nfa) do {} while(0)
+
+#define DESTROY_NFA(nfa) do {} while(0)
+
+#endif
 
 struct nondeterministic_state
 {
@@ -36,13 +64,19 @@ NSTATE nstate_new()
     state->transitions = map_init();
     state->flags = 0;
     state->nfa_id = -1;
+    info("Initialized NSTATE[%p:%s].", state, state->debug_tag ? state->debug_tag : "");
     return state;
 }
 
 int nstate_free(NSTATE state)
 {
-    if (IS_STATE_LOCKED(state)) return -1;
+    if (IS_STATE_LOCKED(state)) 
+    {
+        info("Attempting to free locked NSTATE[%p:%s].", state, state->debug_tag ? state->debug_tag : "");
+        return -1;
+    }
 
+    info("Destroying NSTATE[%p:%s].", state, state->debug_tag ? state->debug_tag : "");
     MAP_ITERATOR iter = map_iterator_init(state->transitions);
     void *data;
     while (map_iterator_has_next(iter))
@@ -62,6 +96,15 @@ int nstate_free(NSTATE state)
  */
 static void __nstate_force_free(NSTATE state)
 {
+    MAP_ITERATOR iter = map_iterator_init(state->transitions);
+    void *data;
+    while (map_iterator_has_next(iter))
+    {
+        map_iterator_next(iter, NULL, &data);
+        set_fini(data);
+    }
+    map_iterator_fini(iter);
+
     map_fini(state->transitions);
     free(state);
 }
@@ -72,6 +115,7 @@ NSTATE nstate_debug_new(const char *debug_tag)
     state->debug_tag = debug_tag;
     state->transitions = map_init();
     state->flags = 0;
+    info("Initialized NSTATE[%p:%s].", state, state->debug_tag ? state->debug_tag : "");
     return state;
 }
 
@@ -82,45 +126,107 @@ const char *nstate_tag(NSTATE state)
 
 int nstate_add_transition(NSTATE from, SYMBOL sym, NSTATE to)
 {
-    if (IS_STATE_LOCKED(from)) return -1;
+    if (IS_STATE_LOCKED(from)) 
+    {
+        info("Attempting to modify locked NSTATE[%p:%s].", from, from->debug_tag ? from->debug_tag : "");
+        return -1;
+    }
+
+    info("Attempting to add transition on symbol %d from NSTATE[%p:%s] to NSTATE[%p:%s].", sym,
+        from, from->debug_tag ? from->debug_tag : "",
+        to, to->debug_tag ? to->debug_tag : "");
 
     SET sym_set = map_get(from->transitions, sym);
     if (!sym_set)
     {
         sym_set = set_init();
         map_add(from->transitions, sym, sym_set);
+        info("No prior transitions on symbol %d from NSTATE[%p:%s]. Created new Set[%p].", sym,
+            from, from->debug_tag ? from->debug_tag : "", sym_set);
     }
-    return set_add(sym_set, to);
+
+    int ret = set_add(sym_set, to);
+    if (ret) 
+    {
+        info("Failed to add transition on symbol %d from NSTATE[%p:%s] to NSTATE[%p:%s].", sym,
+            from, from->debug_tag ? from->debug_tag : "",
+            to, to->debug_tag ? to->debug_tag : "");
+    }
+    else 
+    {
+        info("Successfully added transition on symbol %d from NSTATE[%p:%s] to NSTATE[%p:%s].", sym,
+            from, from->debug_tag ? from->debug_tag : "",
+            to, to->debug_tag ? to->debug_tag : "");
+    }
+    return ret;
 }
 
 int nstate_remove_transition(NSTATE from, SYMBOL sym, NSTATE to)
 {
-    if (IS_STATE_LOCKED(from)) return -1;
+    if (IS_STATE_LOCKED(from)) 
+    {
+        info("Attempting to modify locked NSTATE[%p:%s].", from, from->debug_tag ? from->debug_tag : "");
+        return -1;
+    }
+
+    info("Attempting to remove transition on symbol %d from NSTATE[%p:%s] to NSTATE[%p:%s].", sym,
+        from, from->debug_tag ? from->debug_tag : "",
+        to, to->debug_tag ? to->debug_tag : "");
 
     SET sym_set = map_get(from->transitions, sym);
-    if (!sym_set) return -1;
+    if (!sym_set) 
+    {
+        info("Failed to remove transition on symbol %d from NSTATE[%p:%s] to NSTATE[%p:%s]. Transition did not exist.", sym,
+            from, from->debug_tag ? from->debug_tag : "",
+            to, to->debug_tag ? to->debug_tag : "");
+        return -1;
+    }
     int ret = set_remove(sym_set, to);
     if (!set_size(sym_set))
     {
         set_fini(sym_set);
         map_remove(from->transitions, sym);
+        info("No more transitions on symbol %d from NSTATE[%p:%s] exist after deletion. Freed Set[%p].", sym,
+            from, from->debug_tag ? from->debug_tag : "", sym_set);
     }
+
+    info("Successfully removed transition on symbol %d from NSTATE[%p:%s] to NSTATE[%p:%s].", sym,
+        from, from->debug_tag ? from->debug_tag : "",
+        to, to->debug_tag ? to->debug_tag : "");
+
     return ret;
 }
 
 int nstate_clear_transition_symbol(NSTATE from, SYMBOL sym)
 {
-    if (IS_STATE_LOCKED(from)) return -1;
+    if (IS_STATE_LOCKED(from)) 
+    {
+        info("Attempting to modify locked NSTATE[%p:%s].", from, from->debug_tag ? from->debug_tag : "");
+        return -1;
+    }
 
     SET sym_set = map_get(from->transitions, sym);
-    if (sym_set) set_fini(sym_set);
+    if (sym_set) 
+    {
+        set_fini(sym_set);
+        info("No more transitions on symbol %d from NSTATE[%p:%s] exist after deletion. Freed Set[%p].", sym,
+            from, from->debug_tag ? from->debug_tag : "", sym_set);
+    }
     map_remove(from->transitions, sym);
+
+    info("Successfully cleared all transitions on symbol %d from NSTATE[%p:%s].", sym,
+        from, from->debug_tag ? from->debug_tag : "");
+
     return 0;
 }
 
 int nstate_clear_all_transitions(NSTATE from)
 {
-    if (IS_STATE_LOCKED(from)) return -1;
+    if (IS_STATE_LOCKED(from)) 
+    {
+        info("Attempting to modify locked NSTATE[%p:%s].", from, from->debug_tag ? from->debug_tag : "");
+        return -1;
+    }
 
     SYMBOL sym;
     void *set;
@@ -129,9 +235,15 @@ int nstate_clear_all_transitions(NSTATE from)
     {
         map_iterator_next(iter, &sym, &set);
         set_fini(set);
+        info("No more transitions on symbol %d from NSTATE[%p:%s] exist after deletion. Freed Set[%p].", sym,
+            from, from->debug_tag ? from->debug_tag : "", set);
     }
     map_iterator_fini(iter);
     map_clear(from->transitions);
+
+    info("Successfully cleared all transitions on symbol %d from NSTATE[%p:%s].", sym,
+        from, from->debug_tag ? from->debug_tag : "");
+
     return 0;
 }
 
@@ -241,7 +353,11 @@ static void aggregate_states(NSTATE state, SET state_set, int *uid_counter)
 // O(n + m)
 NFA nfa_new(NSTATE starting_state, NSTATE *accepting_states, size_t num_accepting_states)
 {
-    if (!starting_state || !accepting_states || !num_accepting_states) return NULL;
+    if (!starting_state || !accepting_states || !num_accepting_states) 
+    {
+        info("Invalid arguments passed to nfa_new.");
+        return NULL;
+    }
 
     int nfa_id = 0;
 
@@ -257,9 +373,11 @@ NFA nfa_new(NSTATE starting_state, NSTATE *accepting_states, size_t num_acceptin
     {
         set_fini(accepting);
         set_fini(all);
+        info("Failed to initialize new NFA. Not all accepting states are reachable from the starting state.");
         return NULL;
     }
 
+#ifdef NFA_STATE_LOCKING
     // we have a valid NFA, we lock all the states
     NSTATE state;
     SET_ITERATOR iter = set_iterator_init(all);
@@ -269,12 +387,15 @@ NFA nfa_new(NSTATE starting_state, NSTATE *accepting_states, size_t num_acceptin
         LOCK_STATE(state);
     }
     set_iterator_fini(iter);
+#endif
 
     // allocate now
     NFA nfa = malloc(sizeof(struct nondeterministic_finite_automaton));
     nfa->starting_state = starting_state;
     nfa->accepting_states = accepting;
     nfa->all_states = all;
+
+    info("Initializing NFA[%p].", nfa);
 
     return nfa;
 }
@@ -292,15 +413,18 @@ void nfa_free(NFA automaton)
 
     set_fini(automaton->all_states);
     set_fini(automaton->accepting_states);
+
+    info("Destroying NFA[%p].", automaton);
+
     free(automaton);
 }
 
 /**
  * releases ownership of the states referenced by this automaton
- * and destroys the NFA.
  */
-static void __nfa_release(NFA automaton)
+static void __nfa_unlock_all(NFA automaton)
 {
+#ifdef NFA_STATE_LOCKING
     NSTATE state;
     SET_ITERATOR iter = set_iterator_init(automaton->all_states);
     while (set_iterator_has_next(iter))
@@ -309,7 +433,14 @@ static void __nfa_release(NFA automaton)
         UNLOCK_STATE(state);
     }
     set_iterator_fini(iter);
+#endif
+}
 
+/**
+ * destroys the NFA. it does not release ownership of the states
+ */
+static void __nfa_destroy(NFA automaton)
+{
     set_fini(automaton->all_states);
     set_fini(automaton->accepting_states);
     free(automaton);
@@ -338,6 +469,120 @@ NSTATE *nfa_get_states(NFA automaton)
 size_t nfa_count_states(NFA automaton)
 {
     return set_size(automaton->all_states);
+}
+
+NFA nfa_symbol(SYMBOL symbol)
+{
+    NSTATE start = nstate_new();
+    NSTATE end = nstate_new();
+
+    nstate_add_transition(start, symbol, end);
+
+    NFA nfa = nfa_new(start, &end, 1);
+    return nfa;
+}
+
+NFA nfa_concat(NFA a, NFA b)
+{
+    // release the locks on the states
+    UNLOCK_STATES(a);
+    UNLOCK_STATES(b);
+
+    NSTATE start = nfa_get_starting_state(a);
+    NSTATE *accepting = nfa_get_accepting_states(b);
+    size_t accepting_sz = nfa_count_accepting_states(b);
+
+    NSTATE from;
+    NSTATE to = nfa_get_starting_state(b);
+    // add an epsilon transition from the accepting states of NFA a to the starting state of NFA b
+    SET_ITERATOR iter = set_iterator_init(a->accepting_states);
+
+    while (set_iterator_has_next(iter))
+    {
+        from = set_iterator_next(iter);
+        nstate_add_transition(from, EPSILON, to);
+    }
+    set_iterator_fini(iter);
+
+    DESTROY_NFA(a);
+    DESTROY_NFA(b);
+
+    NFA nfa = nfa_new(start, accepting, accepting_sz);
+    free(accepting);
+    return nfa;
+}
+
+NFA nfa_union(NFA a, NFA b)
+{
+    // release the locks on the states
+    UNLOCK_STATES(a);
+    UNLOCK_STATES(b);
+
+    NSTATE start = nstate_new();
+
+    NSTATE a_start = nfa_get_starting_state(a);
+    NSTATE b_start = nfa_get_starting_state(b);
+
+    nstate_add_transition(start, EPSILON, a_start);
+    nstate_add_transition(start, EPSILON, b_start);
+
+    SET accepting_union = set_union(a->accepting_states, b->accepting_states);
+    NSTATE *accepting_states = (NSTATE*) set_values(accepting_union);
+    size_t accepting_sz = set_size(accepting_union);
+
+    DESTROY_NFA(a);
+    DESTROY_NFA(b);
+
+    NFA nfa = nfa_new(start, accepting_states, accepting_sz);
+    free(accepting_states);
+    return nfa;
+}
+
+NFA nfa_repeat(NFA a)
+{
+    // release the locks on the states
+    UNLOCK_STATES(a);
+
+    NSTATE start = nstate_new();
+    NSTATE accepting = nstate_new();
+    nstate_add_transition(start, EPSILON, accepting);
+
+    NSTATE a_start = nfa_get_starting_state(a);
+    nstate_add_transition(start, EPSILON, a_start);
+
+    NSTATE a_accept;
+    SET_ITERATOR iter = set_iterator_init(a->accepting_states);
+    while (set_iterator_has_next(iter))
+    {
+        a_accept = set_iterator_next(iter);
+        nstate_add_transition(a_accept, EPSILON, a_start);
+        nstate_add_transition(a_accept, EPSILON, accepting);
+    }
+    set_iterator_fini(iter);
+
+    DESTROY_NFA(a);
+    NFA nfa = nfa_new(start, &accepting, 1);
+    return nfa;
+}
+
+int nfa_accept(NFA automaton, SYMBOL *string)
+{
+    NFA_SIM sim = nfa_sim_init(automaton);
+    SYMBOL sym;
+    while ((sym = *string++))
+        nfa_sim_step(sim, sym);
+    SIM_STATUS status = nfa_sim_fini(sim);
+    return status == SIM_SUCCESS;
+}
+
+int nfa_accept_cstr(NFA automaton, char *string)
+{
+    NFA_SIM sim = nfa_sim_init(automaton);
+    SYMBOL sym;
+    while ((sym = *string++))
+        nfa_sim_step(sim, sym);
+    SIM_STATUS status = nfa_sim_fini(sim);
+    return status == SIM_SUCCESS;
 }
 
 void nfa_debug_display(NFA automaton)
@@ -397,48 +642,37 @@ static void merge_sets(SET A, SET B)
     set_iterator_fini(iter);
 }
 
-static SET epsilon_closure_state(NSTATE state)
-{
-    return (SET) map_get(state->transitions, EPSILON);
-}
-
-static SET epsilon_closure_set(SET input)
-{
-    SET set = set_init();
-    NSTATE state;
-    SET_ITERATOR iter = set_iterator_init(input);
-    while (set_iterator_has_next(iter))
-    {
-        state = set_iterator_next(iter);
-        merge_sets(set, epsilon_closure_state(state));
-    }
-    set_iterator_fini(iter);
-    return set;
-}
-
-/**
- * addState(s):
- *      push s onto newStates
- *      alreadyOn[s] = TRUE
- *      for (t in move[s, epsilon]):
- *          if (!alreadyOn[t])
- *              addState(t)
- */
 static void add_state(NFA_SIM sim, NSTATE state)
 {
     stack_push(sim->new_states, state);
     sim->already_on[state->nfa_id] = 1;
 
     SET epsilon_transitions = map_get(state->transitions, EPSILON);
-    SET_ITERATOR iter = set_iterator_init(epsilon_transitions);
-    NSTATE t;
-    while (set_iterator_has_next(iter))
+    if (epsilon_transitions)
     {
-        t = set_iterator_next(iter);
-        if (!sim->already_on[t->nfa_id])
-            add_state(sim, t);
+        SET_ITERATOR iter = set_iterator_init(epsilon_transitions);
+        NSTATE t;
+        while (set_iterator_has_next(iter))
+        {
+            t = set_iterator_next(iter);
+            if (!sim->already_on[t->nfa_id])
+                add_state(sim, t);
+        }
+        set_iterator_fini(iter);
     }
-    set_iterator_fini(iter);
+}
+
+static void transfer_states(NFA_SIM sim)
+{
+    NSTATE state;
+    void *data;
+    while (stack_size(sim->new_states) != 0)
+    {
+        stack_pop(sim->new_states, &data);
+        state = data;
+        stack_push(sim->old_states, state);
+        sim->already_on[state->nfa_id] = 0;
+    }
 }
 
 NFA_SIM nfa_sim_init(NFA automaton)
@@ -451,25 +685,10 @@ NFA_SIM nfa_sim_init(NFA automaton)
     sim->already_on = calloc(sz, sizeof(unsigned char));
 
     add_state(sim, automaton->starting_state);
+    transfer_states(sim);
 
     return sim;
 }
-
-/**
- * S = epsilon_closure_state(s_0)
- * c = nextChar()
- * 
- * while (c != EOF)
- * {
- *      S = eta_closure_set(move(S, c))
- *      c = nextChar()
- * }
- * 
- * if (S INTERSECTION ACCEPTING_STATES != EMPTY)
- *      return YES
- * 
- * return NO
- */
 
 void nfa_sim_step(NFA_SIM sim, SYMBOL input_sym)
 {
@@ -484,24 +703,20 @@ void nfa_sim_step(NFA_SIM sim, SYMBOL input_sym)
         state = data;
 
         set = map_get(state->transitions, input_sym);
-
-        iter = set_iterator_init(set);
-        while (set_iterator_has_next(iter))
+        if (set)
         {
-            state = set_iterator_next(iter);
-            if (!sim->already_on[state->nfa_id])
-                add_state(sim, state);
+            iter = set_iterator_init(set);
+            while (set_iterator_has_next(iter))
+            {
+                state = set_iterator_next(iter);
+                if (!sim->already_on[state->nfa_id])
+                    add_state(sim, state);
+            }
+            set_iterator_fini(iter);
         }
-        set_iterator_fini(iter);
     }
 
-    while (stack_size(sim->new_states) != 0)
-    {
-        stack_pop(sim->new_states, &data);
-        state = data;
-        stack_push(sim->old_states, state);
-        sim->already_on[state->nfa_id] = 0;
-    }
+    transfer_states(sim);
 }
 
 SIM_STATUS nfa_sim_fini(NFA_SIM sim)
@@ -512,6 +727,7 @@ SIM_STATUS nfa_sim_fini(NFA_SIM sim)
     while (stack_size(sim->old_states) != 0)
     {
         stack_pop(sim->old_states, &data);
+        info("Popped NSTATE[%p:%s] from the old states.", data, ((NSTATE) data)->debug_tag ? ((NSTATE) data)->debug_tag : "");
         if (set_contains(sim->nfa->accepting_states, data))
         {
             status = SIM_SUCCESS;

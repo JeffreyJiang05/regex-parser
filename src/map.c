@@ -1,5 +1,9 @@
 #include "map.h"
 
+#ifdef DEBUG
+    #undef DEBUG
+#endif
+
 #include "debug.h"
 
 #include <stdint.h>

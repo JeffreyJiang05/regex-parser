@@ -615,6 +615,7 @@ Test(nstate_tests, nstate_transition_states_simple_0, .timeout = 5)
         sz = nstate_count_transition_states(B, 'a');
 
         cr_assert(nstate_arr_eq(expected, expected_sz, states, sz), "Transition states do not match!");
+        free(states);
     }
 
     {
@@ -625,6 +626,7 @@ Test(nstate_tests, nstate_transition_states_simple_0, .timeout = 5)
         sz = nstate_count_transition_states(A, 'a');
 
         cr_assert(nstate_arr_eq(expected, expected_sz, states, sz), "Transition states do not match!");
+        free(states);
     }
 
     nstate_free(A);
@@ -667,6 +669,7 @@ Test(nstate_tests, nstate_transition_states_simple_1, .timeout = 5)
         sz = nstate_count_transition_states(A, EPSILON);
 
         cr_assert(nstate_arr_eq(expected, expected_sz, states, sz), "Transition states do not match!");
+        free(states);
     }
 
     {
@@ -677,6 +680,7 @@ Test(nstate_tests, nstate_transition_states_simple_1, .timeout = 5)
         sz = nstate_count_transition_states(C, 'b');
 
         cr_assert(nstate_arr_eq(expected, expected_sz, states, sz), "Transition states do not match!");
+        free(states);
     }
 
     nstate_free(A);

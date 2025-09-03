@@ -7,8 +7,9 @@ TEST := test/
 BUILD := build/
 BIN := bin/
 
-CFLAGS := -Wall -Werror -Wno-unused-function
+CFLAGS := -Wall -Werror -Wno-unused-function -DNFA_STATE_LOCKING
 DFLAGS := -g -DDEBUG -DCOLOR
+OFLAGS := -O3 -march=native
 PRINT_STATEMENTS := -DERROR -DSUCCESS -DWARN -DINFO
 
 STD := -std=c17
@@ -31,7 +32,10 @@ TEST_EXEC := $(EXEC)_tests
 
 .PHONY: clean all debug setup
 
-all: setup $(BIN)$(EXEC) $(BIN)$(TEST_EXEC)
+all: CFLAGS += $(OFLAGS)
+all: prod
+
+prod: setup $(BIN)$(EXEC) $(BIN)$(TEST_EXEC)
 
 debug: CFLAGS += $(DFLAGS) $(PRINT_STATEMENTS)
 debug: all
