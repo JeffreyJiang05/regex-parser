@@ -38,7 +38,7 @@ all: prod
 prod: setup $(BIN)$(EXEC) $(BIN)$(TEST_EXEC)
 
 debug: CFLAGS += $(DFLAGS) $(PRINT_STATEMENTS)
-debug: all
+debug: prod
 
 setup: $(BIN) $(BUILD)
 

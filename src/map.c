@@ -189,7 +189,7 @@ int map_set(MAP map, int key, void *value)
     if (REACHED_THRESHOLD(map)) rehash(map);
     no_rehash_add_pair(map->buffer, map->capacity, key, value);
     map->size++;
-    info("Successfully added [%d : %p] to Map[%p].", key, value, map);
+    info("Successfully set [%d : %p] to Map[%p].", key, value, map);
     return 0;
 }
 

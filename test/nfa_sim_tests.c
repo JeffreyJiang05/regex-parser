@@ -45,6 +45,9 @@ Test(nfa_sim_tests, nfa_sim_trivial, .timeout = 5)
 
     cr_assert(status == SIM_FAILURE, "Expected status to be %d. Got %d", SIM_FAILURE, status);
 
+    status = nfa_accept_cstr(nfa, "");
+    cr_assert(status == 0, "Expected status to be zero. Got %d", status);
+
     nfa_free(nfa);
 }
 
@@ -95,6 +98,9 @@ Test(nfa_sim_tests, nfa_sim_simple_0a, .timeout = 5)
 
     cr_assert(status == SIM_SUCCESS, "Expected status to be %d. Got %d", SIM_SUCCESS, status);
 
+    status = nfa_accept_cstr(nfa, "aabb");
+    cr_assert(status != 0, "Expected status to be nonzero. Got %d", status);
+
     nfa_free(nfa);
 }
 
@@ -143,6 +149,10 @@ Test(nfa_sim_tests, nfa_sim_simple_0b, .timeout = 5)
     SIM_STATUS status = nfa_sim_fini(sim);
 
     cr_assert(status == SIM_FAILURE, "Expected status to be %d. Got %d", SIM_FAILURE, status);
+    
+    status = nfa_accept_cstr(nfa, "aab");
+    cr_assert(status == 0, "Expected status to be zero. Got %d", status);
+
     nfa_free(nfa);
 }
 
@@ -191,6 +201,10 @@ Test(nfa_sim_tests, nfa_sim_simple_0c, .timeout = 5)
     SIM_STATUS status = nfa_sim_fini(sim);
 
     cr_assert(status == SIM_SUCCESS, "Expected status to be %d. Got %d", SIM_SUCCESS, status);
+    
+    status = nfa_accept_cstr(nfa, "aac");
+    cr_assert(status != 0, "Expected status to be nonzero. Got %d", SIM_SUCCESS, status);
+
     nfa_free(nfa);
 }
 
@@ -239,6 +253,11 @@ Test(nfa_sim_tests, nfa_sim_simple_0d, .timeout = 5)
     SIM_STATUS status = nfa_sim_fini(sim);
 
     cr_assert(status == SIM_SUCCESS, "Expected status to be %d. Got %d", SIM_SUCCESS, status);
+    
+    status = nfa_accept_cstr(nfa, "bab");
+    cr_assert(status != 0, "Expected status to be nonzero. Got %d", status);
+
+
     nfa_free(nfa);
 }
 
@@ -288,6 +307,10 @@ Test(nfa_sim_tests, nfa_sim_simple_0e, .timeout = 5)
     SIM_STATUS status = nfa_sim_fini(sim);
 
     cr_assert(status == SIM_FAILURE, "Expected status to be %d. Got %d", SIM_FAILURE, status);
+    
+    status = nfa_accept_cstr(nfa, "babk");
+    cr_assert(status == 0, "Expected status to be zero. Got %d", status);
+
     nfa_free(nfa);
 }
 
@@ -342,6 +365,10 @@ Test(nfa_sim_tests, nfa_sim_simple_1a, .timeout = 5)
     SIM_STATUS status = nfa_sim_fini(sim);
 
     cr_assert(status == SIM_FAILURE, "Expected status to be %d. Got %d", SIM_FAILURE, status);
+    
+    status = nfa_accept_cstr(nfa, "aab");
+    cr_assert(status == 0, "Expected status to be zero. Got %d", status);
+        
     nfa_free(nfa);
 }
 
@@ -397,6 +424,10 @@ Test(nfa_sim_tests, nfa_sim_simple_1b, .timeout = 5)
     SIM_STATUS status = nfa_sim_fini(sim);
 
     cr_assert(status == SIM_SUCCESS, "Expected status to be %d. Got %d", SIM_SUCCESS, status);
+    
+    status = nfa_accept_cstr(nfa, "aabb");
+    cr_assert(status != 0, "Expected status to be nonzero. Got %d", status);
+
     nfa_free(nfa);
 }
 
@@ -451,6 +482,10 @@ Test(nfa_sim_tests, nfa_sim_simple_1c, .timeout = 5)
     SIM_STATUS status = nfa_sim_fini(sim);
 
     cr_assert(status == SIM_SUCCESS, "Expected status to be %d. Got %d", SIM_SUCCESS, status);
+    
+    status = nfa_accept_cstr(nfa, "aac");
+    cr_assert(status != 0, "Expected status to be nonzero. Got %d", status);
+   
     nfa_free(nfa);
 }
 
@@ -505,6 +540,10 @@ Test(nfa_sim_tests, nfa_sim_simple_1d, .timeout = 5)
     SIM_STATUS status = nfa_sim_fini(sim);
 
     cr_assert(status == SIM_SUCCESS, "Expected status to be %d. Got %d", SIM_SUCCESS, status);
+    
+    status = nfa_accept_cstr(nfa, "bab");
+    cr_assert(status != 0, "Expected status to be nonzero. Got %d", status);
+    
     nfa_free(nfa);
 }
 
@@ -551,6 +590,9 @@ Test(nfa_sim_tests, nfa_sim_simple_2a, .timeout = 5)
     SIM_STATUS status = nfa_sim_fini(sim);
 
     cr_assert(status == SIM_SUCCESS, "Expected status to be %d. Got %d", SIM_SUCCESS, status);
+
+    status = nfa_accept_cstr(nfa, "adbc");
+    cr_assert(status != 0, "Expected status to be nonzero. Got %d", status);
 
     nfa_free(nfa);
 }
@@ -601,6 +643,9 @@ Test(nfa_sim_tests, nfa_sim_simple_2b, .timeout = 5)
 
     cr_assert(status == SIM_SUCCESS, "Expected status to be %d. Got %d", SIM_SUCCESS, status);
 
+    status = nfa_accept_cstr(nfa, "adadad");
+    cr_assert(status != 0, "Expected status to be nonzero. Got %d", status);
+
     nfa_free(nfa);
 }
 
@@ -643,6 +688,9 @@ Test(nfa_sim_tests, nfa_sim_simple_2c, .timeout = 5)
     SIM_STATUS status = nfa_sim_fini(sim);
 
     cr_assert(status == SIM_SUCCESS, "Expected status to be %d. Got %d", SIM_SUCCESS, status);
+
+    status = nfa_accept_cstr(nfa, "");
+    cr_assert(status != 0, "Expected status to be nonzero. Got %d", status);
 
     nfa_free(nfa);
 }
@@ -699,6 +747,9 @@ Test(nfa_sim_tests, nfa_sim_simple_2d, .timeout = 5)
 
     cr_assert(status == SIM_SUCCESS, "Expected status to be %d. Got %d", SIM_SUCCESS, status);
 
+    status = nfa_accept_cstr(nfa, "bcadadadbcbc");
+    cr_assert(status != 0, "Expected status to be nonzero. Got %d", status);
+
     nfa_free(nfa);
 }
 
@@ -747,6 +798,9 @@ Test(nfa_sim_tests, nfa_sim_simple_2e, .timeout = 5)
     SIM_STATUS status = nfa_sim_fini(sim);
 
     cr_assert(status == SIM_FAILURE, "Expected status to be %d. Got %d", SIM_FAILURE, status);
+
+    status = nfa_accept_cstr(nfa, "abcdab");
+    cr_assert(status == 0, "Expected status to be zero. Got %d", status);
 
     nfa_free(nfa);
 }

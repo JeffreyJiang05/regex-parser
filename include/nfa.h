@@ -46,7 +46,7 @@ const char *nstate_tag(NSTATE state);
  * 
  * @param from the state the transition starts from
  * @param sym the symbol that causes the transition
- * @param to the state the transitionsends in
+ * @param to the state the transition sends in
  * @return zero on success; nonzero otherwise 
  */
 int nstate_add_transition(NSTATE from, SYMBOL sym, NSTATE to);
@@ -207,27 +207,6 @@ NSTATE *nfa_get_states(NFA automaton);
  */
 size_t nfa_count_states(NFA automaton);
 
-/**
- * the following API allows building an NFA using larger components
- * instead of manually manipulating the transitions that is needed
- * with the NSTATE API. 
- * 
- * these functions should be used to compose NFAs in which the structure
- * of the NFA is unknown. thus, this allows for more abstract NFAs such
- * as those with multiple accepting states
- * 
- * it is recommended to build NFAs using the regular_nfa component if it
- * is done from scratch.
- */
-
-NFA nfa_symbol(SYMBOL symbol);
-
-NFA nfa_concat(NFA a, NFA b);
-
-NFA nfa_union(NFA a, NFA b);
-
-NFA nfa_repeat(NFA a);
-
 // the following functions are used to determine if a string is accepted by an NFA
 
 /**
@@ -288,5 +267,25 @@ void nfa_sim_step(NFA_SIM sim, SYMBOL input_sym);
  * @return the final simulator status before destruction
  */
 SIM_STATUS nfa_sim_fini(NFA_SIM sim);
+
+// ------------------------------------------------------------------------ //
+
+typedef struct nfa_component * NFA_COMPONENT;
+
+NFA nfa_construct(NFA_COMPONENT component);
+
+NFA_COMPONENT nfa_symbol(SYMBOL sym);
+
+NFA_COMPONENT nfa_union(NFA_COMPONENT a, NFA_COMPONENT b);
+
+NFA_COMPONENT nfa_concat(NFA_COMPONENT a, NFA_COMPONENT b);
+
+NFA_COMPONENT nfa_repeat(NFA_COMPONENT a);
+
+NFA_COMPONENT nfa_repeat_exact(NFA_COMPONENT a, size_t count);
+
+NFA_COMPONENT nfa_repeat_min(NFA_COMPONENT a, size_t min);
+
+NFA_COMPONENT nfa_repeat_min_max(NFA_COMPONENT a, size_t min, size_t max);
 
 #endif

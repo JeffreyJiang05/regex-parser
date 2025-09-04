@@ -8,6 +8,7 @@
 #include "map.h"
 #include "set.h"
 #include "stack.h"
+#include "ptrmap.h"
 
 const int EPSILON = -1;
 
@@ -471,100 +472,6 @@ size_t nfa_count_states(NFA automaton)
     return set_size(automaton->all_states);
 }
 
-NFA nfa_symbol(SYMBOL symbol)
-{
-    NSTATE start = nstate_new();
-    NSTATE end = nstate_new();
-
-    nstate_add_transition(start, symbol, end);
-
-    NFA nfa = nfa_new(start, &end, 1);
-    return nfa;
-}
-
-NFA nfa_concat(NFA a, NFA b)
-{
-    // release the locks on the states
-    UNLOCK_STATES(a);
-    UNLOCK_STATES(b);
-
-    NSTATE start = nfa_get_starting_state(a);
-    NSTATE *accepting = nfa_get_accepting_states(b);
-    size_t accepting_sz = nfa_count_accepting_states(b);
-
-    NSTATE from;
-    NSTATE to = nfa_get_starting_state(b);
-    // add an epsilon transition from the accepting states of NFA a to the starting state of NFA b
-    SET_ITERATOR iter = set_iterator_init(a->accepting_states);
-
-    while (set_iterator_has_next(iter))
-    {
-        from = set_iterator_next(iter);
-        nstate_add_transition(from, EPSILON, to);
-    }
-    set_iterator_fini(iter);
-
-    DESTROY_NFA(a);
-    DESTROY_NFA(b);
-
-    NFA nfa = nfa_new(start, accepting, accepting_sz);
-    free(accepting);
-    return nfa;
-}
-
-NFA nfa_union(NFA a, NFA b)
-{
-    // release the locks on the states
-    UNLOCK_STATES(a);
-    UNLOCK_STATES(b);
-
-    NSTATE start = nstate_new();
-
-    NSTATE a_start = nfa_get_starting_state(a);
-    NSTATE b_start = nfa_get_starting_state(b);
-
-    nstate_add_transition(start, EPSILON, a_start);
-    nstate_add_transition(start, EPSILON, b_start);
-
-    SET accepting_union = set_union(a->accepting_states, b->accepting_states);
-    NSTATE *accepting_states = (NSTATE*) set_values(accepting_union);
-    size_t accepting_sz = set_size(accepting_union);
-
-    DESTROY_NFA(a);
-    DESTROY_NFA(b);
-
-    NFA nfa = nfa_new(start, accepting_states, accepting_sz);
-    free(accepting_states);
-    return nfa;
-}
-
-NFA nfa_repeat(NFA a)
-{
-    // release the locks on the states
-    UNLOCK_STATES(a);
-
-    NSTATE start = nstate_new();
-    NSTATE accepting = nstate_new();
-    nstate_add_transition(start, EPSILON, accepting);
-
-    NSTATE a_start = nfa_get_starting_state(a);
-    nstate_add_transition(start, EPSILON, a_start);
-
-    NSTATE a_accept;
-    SET_ITERATOR iter = set_iterator_init(a->accepting_states);
-    while (set_iterator_has_next(iter))
-    {
-        a_accept = set_iterator_next(iter);
-        nstate_add_transition(a_accept, EPSILON, a_start);
-        nstate_add_transition(a_accept, EPSILON, accepting);
-    }
-    set_iterator_fini(iter);
-
-    DESTROY_NFA(a);
-    NFA nfa = nfa_new(start, &accepting, 1);
-    return nfa;
-}
-
 int nfa_accept(NFA automaton, SYMBOL *string)
 {
     NFA_SIM sim = nfa_sim_init(automaton);
@@ -741,4 +648,219 @@ SIM_STATUS nfa_sim_fini(NFA_SIM sim)
     free(sim);
 
     return status;
+}
+
+static NSTATE nstate_clone(NSTATE state, PTR_MAP ptrmap)
+{
+    NSTATE copy = nstate_new();
+    copy->debug_tag = state->debug_tag;
+    copy->flags = state->flags;
+    copy->nfa_id = state->nfa_id;
+
+    ptrmap_set(ptrmap, state, copy);
+
+    MAP_ITERATOR map_iter = map_iterator_init(state->transitions);
+    SET_ITERATOR set_iter;
+    SYMBOL sym;
+    void *data;
+    while (map_iterator_has_next(map_iter))
+    {
+        map_iterator_next(map_iter, &sym, &data);
+
+        set_iter = set_iterator_init(data);
+        while (set_iterator_has_next(set_iter))
+        {
+            NSTATE to = set_iterator_next(set_iter);
+
+            NSTATE to_copy = ptrmap_get(ptrmap, to);            
+            if (!to_copy) to_copy = nstate_clone(to, ptrmap);
+
+            nstate_add_transition(copy, sym, to_copy);
+        }
+        set_iterator_fini(set_iter);
+    }
+    map_iterator_fini(map_iter);
+    return copy;
+}
+
+struct nfa_component
+{
+    NSTATE starting_state;
+    NSTATE accepting_state;
+};
+
+static NFA_COMPONENT component_new(NSTATE start, NSTATE accepting)
+{
+    NFA_COMPONENT component = malloc(sizeof(struct nfa_component));
+    component->starting_state = start;
+    component->accepting_state = accepting;
+    return component;
+}
+
+static void component_free(NFA_COMPONENT component)
+{
+    free(component);
+}
+
+static void component_free_internals(NFA_COMPONENT component)
+{
+    NFA nfa = nfa_construct(component);
+    nfa_free(nfa);
+}
+
+static NFA_COMPONENT component_clone(NFA_COMPONENT component)
+{
+    PTR_MAP map = ptrmap_init();
+    NSTATE clone_start = nstate_clone(component->starting_state, map);
+
+    NSTATE clone_accept = ptrmap_get(map, component->accepting_state);
+    ptrmap_fini(map);
+
+    NFA_COMPONENT copy = component_new(clone_start, clone_accept);
+    return copy;
+}
+
+NFA nfa_construct(NFA_COMPONENT component)
+{
+    info("Constructing NFA from Component[%p].", component);
+
+    NSTATE starting_state = component->starting_state;
+    NSTATE accepting_state = component->accepting_state;
+    NFA nfa = nfa_new(starting_state, &accepting_state, 1);
+    component_free(component);
+    return nfa;
+}
+
+NFA_COMPONENT nfa_symbol(SYMBOL sym)
+{
+    NSTATE start = nstate_new();
+    NSTATE end = nstate_new();
+    nstate_add_transition(start, sym, end);
+
+    NFA_COMPONENT component = component_new(start, end);
+    info("Creating symbol %d construct in Component[%p].", sym, component);
+
+    return component;
+}
+
+NFA_COMPONENT nfa_union(NFA_COMPONENT a, NFA_COMPONENT b)
+{
+    // if either is null, just return the other
+    if (!a) return b;
+    else if (!b) return a;
+
+    info("Attempting to form the union of Component[%p] and Component[%p].", a, b);
+
+    NSTATE start = nstate_new();
+    NSTATE end = nstate_new();
+    
+    nstate_add_transition(start, EPSILON, a->starting_state);
+    nstate_add_transition(start, EPSILON, b->starting_state);
+
+    nstate_add_transition(a->accepting_state, EPSILON, end);
+    nstate_add_transition(b->accepting_state, EPSILON, end);
+
+    NFA_COMPONENT component = component_new(start, end);
+
+    info("Successfully formed the union of Component[%p] and Component[%p] into Component[%p].", a, b, component);
+
+    component_free(a);
+    component_free(b);
+    return component;
+}
+
+NFA_COMPONENT nfa_concat(NFA_COMPONENT a, NFA_COMPONENT b)
+{
+    // if either is null, just return the other
+    if (!a) return b;
+    else if (!b) return a;
+
+    info("Attempting to form the concatenation of Component[%p] and Component[%p].", a, b);
+
+    NSTATE start = a->starting_state;
+    NSTATE end = b->accepting_state;
+    
+    nstate_add_transition(a->accepting_state, EPSILON, b->starting_state);
+
+    NFA_COMPONENT component = component_new(start, end);
+
+    info("Successfully formed the concatenation of Component[%p] and Component[%p] into Component[%p].", a, b, component);
+    
+    component_free(a);
+    component_free(b);
+
+    return component;
+}
+
+NFA_COMPONENT nfa_repeat(NFA_COMPONENT a)
+{
+    NSTATE start = nstate_new();
+    NSTATE end = nstate_new();
+
+    nstate_add_transition(start, EPSILON, end);
+    nstate_add_transition(start, EPSILON, a->starting_state);
+    nstate_add_transition(a->accepting_state, EPSILON, end);
+    nstate_add_transition(a->accepting_state, EPSILON, a->starting_state);
+
+    NFA_COMPONENT component = component_new(start, end);
+    component_free(a);
+
+    return component;
+}
+
+NFA_COMPONENT nfa_repeat_exact(NFA_COMPONENT a, size_t count)
+{
+    // trivial state
+    if (count == 0)
+    {
+        NSTATE state = nstate_new();
+        component_free_internals(a);
+        return component_new(state, state);
+    }
+    else if (count == 1) return a;
+
+    NFA_COMPONENT aggregate = component_clone(a);
+    while (--count)
+    {
+        NFA_COMPONENT clone = component_clone(a);
+        aggregate = nfa_concat(aggregate, clone);
+    }
+    component_free_internals(a);
+
+    return aggregate;
+}
+
+NFA_COMPONENT nfa_repeat_min(NFA_COMPONENT a, size_t min)
+{
+    if (min == 0) return nfa_repeat(a);
+    
+    NFA_COMPONENT head = component_clone(a);
+    while (--min)
+    {
+        NFA_COMPONENT clone = component_clone(a);
+        head = nfa_concat(head, clone);
+    }
+    
+    NFA_COMPONENT tail = nfa_repeat(component_clone(a));
+    NFA_COMPONENT final = nfa_concat(head, tail);
+
+    component_free_internals(a);
+    return final;
+}
+
+// inclusive-inclusive
+NFA_COMPONENT nfa_repeat_min_max(NFA_COMPONENT a, size_t min, size_t max)
+{
+    NFA_COMPONENT aggregate = NULL;
+
+    while (min <= max)
+    {
+        NFA_COMPONENT clone = component_clone(a);
+        NFA_COMPONENT repeat = nfa_repeat_exact(clone, min);
+        aggregate = nfa_union(aggregate, repeat);
+        min++;
+    }
+
+    component_free_internals(a);
+    return aggregate;
 }
