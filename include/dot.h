@@ -16,6 +16,6 @@ int nfa_gen_img(NFA nfa, char *filename);
 
 int dfa_gen_dot(DFA dfa, char *filename);
 
-int dfa_gen_dot(DFA dfa, char *filename);
+int dfa_gen_img(DFA dfa, char *filename);
 
 #endif
