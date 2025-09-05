@@ -119,7 +119,7 @@ void dstate_debug_display(DSTATE state, size_t indent);
 
 // -------------------------------------------------------------------------------------- //
 
-typedef struct nondeterministic_finite_automaton * DFA;
+typedef struct deterministic_finite_automaton * DFA;
 
 /**
  * creates a new deterministc finite automata (DFA)
@@ -217,7 +217,6 @@ void dfa_debug_display(DFA automaton);
 
 // -------------------------------------------------------------------------------------- //
 
-#if 0
 typedef struct DFA_simulator * DFA_SIM;
 
 /**
@@ -243,7 +242,5 @@ void dfa_sim_step(DFA_SIM sim, SYMBOL input_sym);
  * @return the final simulator status before destruction
  */
 SIM_STATUS dfa_sim_fini(DFA_SIM sim);
-
-#endif
 
 #endif

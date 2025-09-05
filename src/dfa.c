@@ -67,6 +67,15 @@ DSTATE dstate_new()
     return state;
 }
 
+/**
+ * force frees the object regardless of lock
+ */
+static void __dstate_force_free(DSTATE state)
+{
+    map_fini(state->transitions);
+    free(state);
+}
+
 int dstate_free(DSTATE state)
 {
     if (IS_STATE_LOCKED(state))
@@ -209,3 +218,155 @@ void dstate_debug_display(DSTATE state, size_t indent)
     map_iterator_fini(iter);
 }
 
+// -------------------------------------------------------------------------------------- //
+
+struct deterministic_finite_automaton
+{
+    DSTATE starting_state;
+    SET accepting_states;
+    SET all_states;  
+};
+
+static void aggregate_states(DSTATE state, SET state_set, int *uid_counter)
+{
+    set_add(state_set, state);
+    state->dfa_id = (*uid_counter)++;
+
+    void *data;
+    MAP_ITERATOR iter = map_iterator_init(state->transitions);
+    while (map_iterator_has_next(iter))
+    {
+        map_iterator_next(iter, NULL, &data);
+        if (!set_contains(state_set, data)) aggregate_states(data, state_set, uid_counter);
+    }
+    map_iterator_fini(iter);
+}
+
+DFA dfa_new(DSTATE starting_state, DSTATE *accepting_states, size_t num_accepting_states)
+{
+    if (!starting_state || !accepting_states || !num_accepting_states) 
+    {
+        info("Invalid arguments passed to dfa_new.");
+        return NULL;
+    }
+
+    int dfa_id = 0;
+    SET accepting = set_init();
+    for (size_t i = 0; i < num_accepting_states; ++i)
+        set_add(accepting, accepting_states[i]);
+    
+    SET all = set_init();
+    aggregate_states(starting_state, all, &dfa_id);
+
+    if (!is_subset(accepting, all))
+    {
+        set_fini(accepting);
+        set_fini(all);
+        info("Failed to initialize new DFA. Not all accepting states are reachable from the starting state.");
+        return NULL;
+    }
+
+#ifdef DFA_STATE_LOCKING
+    // we have a valid DFA, we lock all the states
+    DSTATE state;
+    SET_ITERATOR iter = set_iterator_init(all);
+    while (set_iterator_has_next(iter))
+    {
+        state = set_iterator_next(iter);
+        LOCK_STATE(state);
+    }
+    set_iterator_fini(iter);
+#endif
+
+    // allocate new
+    DFA dfa = malloc(sizeof(struct deterministic_finite_automaton));
+    dfa->starting_state = starting_state;
+    dfa->accepting_states = accepting;
+    dfa->all_states = all;
+
+    info("Initializing DFA[%p].", dfa);
+
+    return dfa;
+}
+
+void dfa_free(DFA automaton)
+{
+    DSTATE state; 
+    SET_ITERATOR iter = set_iterator_init(automaton->all_states);
+    while (set_iterator_has_next(iter))
+    {
+        state = set_iterator_next(iter);
+        __dstate_force_free(state);
+    }
+    set_iterator_fini(iter);
+
+    set_fini(automaton->all_states);
+    set_fini(automaton->accepting_states);
+    
+    info("Destroying DFA[%p].", automaton);
+    free(automaton);
+}
+
+DSTATE dfa_get_starting_state(DFA automaton)
+{
+    return automaton->starting_state;
+}
+
+DSTATE *dfa_get_accepting_states(DFA automaton)
+{
+    return (DSTATE*) set_values(automaton->accepting_states);
+}
+
+size_t dfa_count_accepting_states(DFA automaton)
+{
+    return set_size(automaton->accepting_states);
+}
+
+DSTATE *dfa_get_states(DFA automaton)
+{
+    return (DSTATE*) set_values(automaton->all_states);
+}
+
+size_t dfa_count_states(DFA automaton)
+{
+    return set_size(automaton->all_states);
+}
+
+int dfa_accept(DFA automaton, SYMBOL *string);
+
+int dfa_accept_cstr(DFA automaton, char *string);
+
+void dfa_debug_display(DFA automaton)
+{
+    SET_ITERATOR iter;
+    DSTATE state;
+
+    DSTATE starting_state = automaton->starting_state;
+    SET accepting_states = automaton->accepting_states;
+    SET all_states = automaton->all_states;
+
+    printf("DFA[%p]\n", automaton);
+    printf("\tSTARTING STATE: ");
+
+    if (starting_state->debug_tag) printf("STATE[%s|%p]\n", starting_state->debug_tag, starting_state);
+    else printf("STATE[%p]\n", starting_state);
+
+    printf("\tACCEPTING STATES:\n");
+    iter = set_iterator_init(accepting_states);
+    while (set_iterator_has_next(iter))
+    {
+        state = set_iterator_next(iter);
+        if (state->debug_tag) printf("\t\tSTATE[%s|%p]\n", state->debug_tag, state);
+        else printf("\t\tSTATE[%p]\n", state);
+    }
+    set_iterator_fini(iter);
+
+    printf("\tALL STATES:\n");
+    iter = set_iterator_init(all_states);
+    while (set_iterator_has_next(iter))
+    {
+        state = set_iterator_next(iter);
+        dstate_debug_display(state, 2);
+    }
+    set_iterator_fini(iter);
+}

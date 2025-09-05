@@ -7,7 +7,7 @@ TEST := test/
 BUILD := build/
 BIN := bin/
 
-CFLAGS := -Wall -Werror -Wno-unused-function -DNFA_STATE_LOCKING
+CFLAGS := -Wall -Werror -Wno-unused-function -DNFA_STATE_LOCKING -DDFA_STATE_LOCKING
 DFLAGS := -g -DDEBUG -DCOLOR
 OFLAGS := -O3 -march=native
 PRINT_STATEMENTS := -DERROR -DSUCCESS -DWARN -DINFO
