@@ -10,8 +10,6 @@
 #include "stack.h"
 #include "ptrmap.h"
 
-const int EPSILON = -1;
-
 /**
  * NFA_STATE_LOCKING toggles if the states owned by an NFA should be locked so that they are immutable
  * this is highly recommended for code that requires debugging

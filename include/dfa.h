@@ -9,8 +9,6 @@ typedef int SYMBOL;
 
 typedef struct deterministic_state * DSTATE;
 
-extern const int EPSILON;
-
 /**
  * creates a new deterministc state
  * 
@@ -62,15 +60,6 @@ int dstate_add_transition(DSTATE from, SYMBOL sym, DSTATE to);
  * @return zero on success; nonzero otherwise
  */
 int dstate_remove_transition(DSTATE from, SYMBOL sym, DSTATE to);
-
-/**
- * removes all transitions from a state on a symbol
- * 
- * @param from the state the transitions start from
- * @param sym the symbol that causes the transitions to be removed
- * @return zero on success; nonzero otherwise
- */
-int dstate_clear_transition_symbol(DSTATE from, SYMBOL sym);
 
 /**
  * removes all transitions from a state
@@ -228,6 +217,7 @@ void dfa_debug_display(DFA automaton);
 
 // -------------------------------------------------------------------------------------- //
 
+#if 0
 typedef struct DFA_simulator * DFA_SIM;
 
 /**
@@ -253,5 +243,7 @@ void dfa_sim_step(DFA_SIM sim, SYMBOL input_sym);
  * @return the final simulator status before destruction
  */
 SIM_STATUS dfa_sim_fini(DFA_SIM sim);
+
+#endif
 
 #endif

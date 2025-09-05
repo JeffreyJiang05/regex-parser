@@ -9,8 +9,6 @@ typedef int SYMBOL;
 
 typedef struct nondeterministic_state * NSTATE;
 
-extern const int EPSILON;
-
 /**
  * creates a new nondeterministic state
  * 

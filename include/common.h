@@ -7,4 +7,6 @@ typedef enum sim_status
     SIM_SUCCESS = 0
 } SIM_STATUS;
 
+extern const int EPSILON;
+
 #endif
