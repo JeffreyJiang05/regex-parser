@@ -282,8 +282,8 @@ int nstate_has_transition(NSTATE from, SYMBOL sym, NSTATE to)
 void nstate_debug_display(NSTATE state, size_t indent)
 {
     for (size_t i = 0; i < indent; ++i) printf("\t");
-    if (state->debug_tag) printf("STATE[%s|%p]\n", state->debug_tag, state);
-    else printf("STATE[%p]\n", state);
+    if (state->debug_tag) printf("NSTATE[%s|%p]\n", state->debug_tag, state);
+    else printf("NSTATE[%p]\n", state);
     
     int transition_key;
     NSTATE to;
@@ -307,7 +307,7 @@ void nstate_debug_display(NSTATE state, size_t indent)
             else printf("----[%d]--> ", transition_key);
             
             if (to->debug_tag) printf("STATE[%s|%p]\n", to->debug_tag, to);
-            else printf("STATE[%p]\n", to);
+            else printf("NSTATE[%p]\n", to);
         }
         set_iterator_fini(state_iter);
     }
