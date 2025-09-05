@@ -3,6 +3,8 @@
 
 #include <stdlib.h>
 
+#include "common.h"
+
 typedef int SYMBOL;
 
 typedef struct nondeterministic_state * NSTATE;
@@ -237,12 +239,6 @@ void nfa_debug_display(NFA automaton);
 // -------------------------------------------------------------------------------------- //
 
 typedef struct NFA_simulator * NFA_SIM;
-
-typedef enum sim_status
-{
-    SIM_FAILURE = -1,
-    SIM_SUCCESS = 0
-} SIM_STATUS;
 
 /**
  * creates a new object for simulating the NFA

@@ -3,6 +3,8 @@
 
 #include <stdlib.h>
 
+#include "common.h"
+
 typedef int SYMBOL;
 
 typedef struct deterministic_state * DSTATE;
@@ -227,12 +229,6 @@ void dfa_debug_display(DFA automaton);
 // -------------------------------------------------------------------------------------- //
 
 typedef struct DFA_simulator * DFA_SIM;
-
-typedef enum sim_status
-{
-    SIM_FAILURE = -1,
-    SIM_SUCCESS = 0
-} SIM_STATUS;
 
 /**
  * creates a new object for simulating the DFA
