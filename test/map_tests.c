@@ -3,7 +3,7 @@
 
 #include <criterion/criterion.h>
 
-#include "map.h"
+#include "utility/map.h"
 
 typedef union
 {

@@ -1,6 +1,6 @@
 #include <criterion/criterion.h>
 
-#include "nfa.h"
+#include "automata/nfa.h"
 
 /**
  * Using the following automaton 

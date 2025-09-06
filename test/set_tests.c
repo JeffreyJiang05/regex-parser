@@ -3,7 +3,7 @@
 
 #include <criterion/criterion.h>
 
-#include "set.h"
+#include "utility/set.h"
 
 typedef union
 {

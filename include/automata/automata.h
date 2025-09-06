@@ -16,5 +16,6 @@
 
 #include "nfa.h"
 #include "dfa.h"
+#include "dot.h"
 
 #endif

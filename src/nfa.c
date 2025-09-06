@@ -1,14 +1,14 @@
-#include "nfa.h"
+#include "automata/nfa.h"
 
 #include "debug.h"
 
 #include <stdio.h>
 #include <ctype.h>
 
-#include "map.h"
-#include "set.h"
-#include "stack.h"
-#include "ptrmap.h"
+#include "utility/map.h"
+#include "utility/set.h"
+#include "utility/stack.h"
+#include "utility/ptrmap.h"
 
 /**
  * NFA_STATE_LOCKING toggles if the states owned by an NFA should be locked so that they are immutable

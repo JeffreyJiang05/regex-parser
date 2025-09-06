@@ -1,6 +1,6 @@
 #include <criterion/criterion.h>
 
-#include "dfa.h"
+#include "automata/dfa.h"
 
 /**
  * Using the following automaton 

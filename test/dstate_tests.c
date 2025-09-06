@@ -1,6 +1,6 @@
 #include <criterion/criterion.h>
 
-#include "dfa.h"
+#include "automata/dfa.h"
 
 Test(dstate_tests, dstate_lifetime, .timeout = 5)
 {

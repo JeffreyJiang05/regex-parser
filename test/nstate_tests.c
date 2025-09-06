@@ -1,6 +1,6 @@
 #include <criterion/criterion.h>
 
-#include "nfa.h"
+#include "automata/nfa.h"
 
 Test(nstate_tests, nstate_lifetime, .timeout = 5)
 {

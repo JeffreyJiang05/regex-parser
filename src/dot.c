@@ -1,4 +1,4 @@
-#include "dot.h"
+#include "automata/dot.h"
 
 #include <unistd.h>
 #include <string.h>
@@ -6,7 +6,7 @@
 #include <ctype.h>
 #include <sys/wait.h>
 
-#include "ptrmap.h"
+#include "utility/ptrmap.h"
 
 #define ITOA_BUFFER_SZ 3
 

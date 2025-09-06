@@ -2,8 +2,8 @@
 
 #include "debug.h"
 
-#include "nfa.h"
-#include "dot.h"
+#include "automata/nfa.h"
+#include "automata/dot.h"
 
 int main()
 {

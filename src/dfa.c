@@ -1,12 +1,12 @@
-#include "dfa.h"
+#include "automata/dfa.h"
 
 #include "debug.h"
 
 #include <stdio.h>
 #include <ctype.h>
 
-#include "map.h"
-#include "set.h"
+#include "utility/map.h"
+#include "utility/set.h"
 
 /**
  * DFA_STATE_LOCKING toggles if the states owned by an DFA should be locked so that they are immutable
@@ -332,9 +332,25 @@ size_t dfa_count_states(DFA automaton)
     return set_size(automaton->all_states);
 }
 
-int dfa_accept(DFA automaton, SYMBOL *string);
+int dfa_accept(DFA automaton, SYMBOL *string)
+{
+    DFA_SIM sim = dfa_sim_init(automaton);
+    SYMBOL sym;
+    while ((sym = *string++))
+        dfa_sim_step(sim, sym);
+    SIM_STATUS status = dfa_sim_fini(sim);
+    return status == SIM_SUCCESS;
+}
 
-int dfa_accept_cstr(DFA automaton, char *string);
+int dfa_accept_cstr(DFA automaton, char *string)
+{
+    DFA_SIM sim = dfa_sim_init(automaton);
+    SYMBOL sym;
+    while ((sym = *string++))
+        dfa_sim_step(sim, sym);
+    SIM_STATUS status = dfa_sim_fini(sim);
+    return status == SIM_SUCCESS;
+}
 
 void dfa_debug_display(DFA automaton)
 {
@@ -369,4 +385,35 @@ void dfa_debug_display(DFA automaton)
         dstate_debug_display(state, 2);
     }
     set_iterator_fini(iter);
+}
+
+// -------------------------------------------------------------------------------------- //
+
+struct DFA_simulator
+{
+    DFA dfa;
+    DSTATE active;
+};
+
+DFA_SIM dfa_sim_init(DFA automaton)
+{
+    if (!automaton) return NULL;
+
+    DFA_SIM sim = malloc(sizeof(struct DFA_simulator));
+    sim->dfa = automaton;
+    sim->active = automaton->starting_state;
+    return sim;
+}
+
+void dfa_sim_step(DFA_SIM sim, SYMBOL input_sym)
+{
+    if (!sim) return;
+
+    if (sim->active)
+        sim->active = dstate_get_transition_state(sim->active, input_sym);
+}
+
+SIM_STATUS dfa_sim_fini(DFA_SIM sim)
+{
+    return set_contains(sim->dfa->accepting_states, sim->active) ? SIM_SUCCESS : SIM_FAILURE;
 }
