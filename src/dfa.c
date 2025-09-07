@@ -415,5 +415,7 @@ void dfa_sim_step(DFA_SIM sim, SYMBOL input_sym)
 
 SIM_STATUS dfa_sim_fini(DFA_SIM sim)
 {
-    return set_contains(sim->dfa->accepting_states, sim->active) ? SIM_SUCCESS : SIM_FAILURE;
+    SIM_STATUS result = set_contains(sim->dfa->accepting_states, sim->active) ? SIM_SUCCESS : SIM_FAILURE;
+    free(sim);
+    return result;
 }

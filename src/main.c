@@ -12,20 +12,36 @@ int main()
     char *dfa_output_fn = "DFA.png";
 
     // REGEX FOR (a|b)*abb
-    NFA_COMPONENT builder = nfa_concat(
-        nfa_repeat(
+    /* NFA_COMPONENT builder = nfa_concat(
+        nfa_repeat_min(
             nfa_union(
-                nfa_symbol('a'),
-                nfa_symbol('b')
-            )
-        ),
+                nfa_concat(
+                    nfa_symbol('a'),
+                    nfa_symbol('b')
+                ),
+                nfa_concat(
+                    nfa_symbol('c'),
+                    nfa_symbol('d')
+                )
+            ),
+        2),
         nfa_concat(
-            nfa_symbol('a'),
+            nfa_symbol('d'),
             nfa_concat(
-                nfa_symbol('b'),
+                nfa_symbol('c'),
                 nfa_symbol('b')
             )
         )
+    ); */
+
+    NFA_COMPONENT builder = NFA_CONCAT_MANY(
+        NFA_REPEAT_MIN(
+            NFA_UNION(
+                NFA_CONCAT('a', 'b'),
+                NFA_CONCAT('c', 'd')
+            ), 2
+        ),
+        'd', 'c', 'b'
     );
 
     NFA nfa = nfa_construct(builder);

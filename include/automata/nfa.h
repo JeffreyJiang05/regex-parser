@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "common.h"
+#include "macro.h"
 
 typedef int SYMBOL;
 
@@ -281,5 +282,35 @@ NFA_COMPONENT nfa_repeat_exact(NFA_COMPONENT a, size_t count);
 NFA_COMPONENT nfa_repeat_min(NFA_COMPONENT a, size_t min);
 
 NFA_COMPONENT nfa_repeat_min_max(NFA_COMPONENT a, size_t min, size_t max);
+
+NFA_COMPONENT nfa_concat_va(size_t count, ...);
+
+// macro for concat many components together
+#define nfa_concat_many(...) nfa_concat_va(NARGS(__VA_ARGS__), __VA_ARGS__)
+
+NFA_COMPONENT nfa_union_va(size_t count, ...);
+
+#define nfa_union_many(...) nfa_union_va(NARGS(__VA_ARGS__), __VA_ARGS__)
+
+inline NFA_COMPONENT __sym_conv_address(NFA_COMPONENT component) { return component; };
+#define SYM_CONV(type) _Generic((type), \
+                        int: nfa_symbol, \
+                        default: __sym_conv_address \
+)(type)
+#define SYM_CONV_LIST_INDIRECTION() SYM_CONV_LIST_HELPER
+#define SYM_CONV_LIST1(arg0) SYM_CONV(arg0)
+#define SYM_CONV_LIST0(arg0, ...) SYM_CONV(arg0), SYM_CONV_LIST_INDIRECTION EMPTY()()(__VA_ARGS__)
+#define SYM_CONV_LIST_HELPER(...) CAT(SYM_CONV_LIST, EQUAL(NARGS(__VA_ARGS__), 1))(__VA_ARGS__)
+#define SYM_CONV_LIST(...) EVAL4(SYM_CONV_LIST_HELPER(__VA_ARGS__))
+
+#define NFA_SYMBOL(sym) nfa_symbol(sym)
+#define NFA_UNION(arg0, arg1) nfa_union(SYM_CONV(arg0), SYM_CONV(arg1))
+#define NFA_CONCAT(arg0, arg1) nfa_concat(SYM_CONV(arg0), SYM_CONV(arg1))
+#define NFA_REPEAT(arg0) nfa_repeat(SYM_CONV(arg0))
+#define NFA_REPEAT_EXACT(arg0, count) nfa_repeat_exact(SYM_CONV(arg0), count)
+#define NFA_REPEAT_MIN(arg0, min) nfa_repeat_min(SYM_CONV(arg0), min)
+#define NFA_REPEAT_MIN_MAX(arg0, min, max) nfa_repeat_min_max(SYM_CONV(arg0), min, max)
+#define NFA_CONCAT_MANY(...) nfa_concat_many(SYM_CONV_LIST(__VA_ARGS__))
+#define NFA_UNION_MANY(...) nfa_union_many(SYM_CONV_LIST(__VA_ARGS__)) 
 
 #endif

@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <ctype.h>
+#include <stdarg.h>
 
 #include "utility/map.h"
 #include "utility/set.h"
@@ -778,7 +779,29 @@ NFA_COMPONENT nfa_concat(NFA_COMPONENT a, NFA_COMPONENT b)
     NSTATE start = a->starting_state;
     NSTATE end = b->accepting_state;
     
-    nstate_add_transition(a->accepting_state, EPSILON, b->starting_state);
+    NSTATE a_accepting = a->accepting_state;
+    NSTATE b_starting = b->starting_state;
+
+    SYMBOL sym;
+    void *set;
+    NSTATE to;
+    MAP_ITERATOR transition_iter = map_iterator_init(b_starting->transitions);
+    while (map_iterator_has_next(transition_iter))
+    {
+        map_iterator_next(transition_iter, &sym, &set);
+        SET_ITERATOR state_iter = set_iterator_init(set);
+        while (set_iterator_has_next(state_iter))
+        {
+            to = set_iterator_next(state_iter);
+            nstate_add_transition(a_accepting, sym, to);
+        }
+        set_iterator_fini(state_iter);
+    }
+    map_iterator_fini(transition_iter);
+    nstate_free(b_starting); // no longer needed
+
+    // this may be faster overall
+    // nstate_add_transition(a->accepting_state, EPSILON, b->starting_state);
 
     NFA_COMPONENT component = component_new(start, end);
 
@@ -861,4 +884,42 @@ NFA_COMPONENT nfa_repeat_min_max(NFA_COMPONENT a, size_t min, size_t max)
 
     component_free_internals(a);
     return aggregate;
+}
+
+NFA_COMPONENT nfa_concat_va(size_t count, ...)
+{
+    NFA_COMPONENT aggregate = NULL;
+    va_list va;
+    va_start(va, count);
+    for (size_t i = 0; i < count; ++i)
+    {
+        NFA_COMPONENT next_component = va_arg(va, NFA_COMPONENT);
+        aggregate = nfa_concat(aggregate, next_component);
+    }
+    va_end(va);
+    return aggregate;
+}
+
+NFA_COMPONENT nfa_union_va(size_t count, ...)
+{
+    NSTATE starting = nstate_new();
+    NSTATE accepting = nstate_new();
+
+    va_list va;
+    va_start(va, count);
+    for (size_t i = 0; i < count; ++i)
+    {
+        NFA_COMPONENT next_component = va_arg(va, NFA_COMPONENT);
+        NSTATE next_starting = next_component->starting_state;
+        NSTATE next_accepting = next_component->accepting_state;
+
+        nstate_add_transition(starting, EPSILON, next_starting);
+        nstate_add_transition(next_accepting, EPSILON, accepting);
+
+        component_free(next_component);
+    }
+    va_end(va);
+
+    NFA_COMPONENT component = component_new(starting, accepting);
+    return component;
 }

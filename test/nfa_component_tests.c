@@ -196,3 +196,51 @@ Test(nfa_component_tests, component_simple_2, .timeout = 5)
 
     nfa_free(nfa);
 }
+
+/**
+ * Using the following regex:
+ *  (abc|cde|efg)
+ */
+Test(nfa_component_tests, component_simple_3, .timeout = 5)
+{
+    NFA_COMPONENT component = nfa_union_many(
+        nfa_concat_many(
+            nfa_symbol('a'),
+            nfa_symbol('b'),
+            nfa_symbol('c')
+        ),
+        nfa_concat_many(
+            nfa_symbol('c'),
+            nfa_symbol('d'),
+            nfa_symbol('e')
+        ),
+        nfa_concat_many(
+            nfa_symbol('e'),
+            nfa_symbol('f'),
+            nfa_symbol('g')
+        )
+    );
+
+    NFA nfa = nfa_construct(component);
+
+    char *input = NULL;
+    int ret;
+
+    input = "";
+    ret = nfa_accept_cstr(nfa, input);
+    cr_assert(ret == 0, "Expected nfa_accept for \"%s\" to return zero. Got %d", input, ret);
+
+    input = "abc";
+    ret = nfa_accept_cstr(nfa, input);
+    cr_assert(ret != 0, "Expected nfa_accept for \"%s\" to return nonzero. Got %d", input, ret);
+
+    input = "cde";
+    ret = nfa_accept_cstr(nfa, input);
+    cr_assert(ret != 0, "Expected nfa_accept for \"%s\" to return nonzero. Got %d", input, ret);
+
+    input = "efg";
+    ret = nfa_accept_cstr(nfa, input);
+    cr_assert(ret != 0, "Expected nfa_accept for \"%s\" to return nonzero. Got %d", input, ret);
+
+    nfa_free(nfa);
+}
