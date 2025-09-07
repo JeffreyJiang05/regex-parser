@@ -14,6 +14,9 @@ static const char *dot_header = "digraph finite_automaton { rankdir=LR;"
                            "start [shape=point, style=invis];"
                            "node [shape=doublecircle];";
 
+static const char *dot_footer = "{ rank = min; start; }"
+                                "{rank = max; ";
+
 struct state_id_map
 {
     PTR_MAP map;
@@ -148,7 +151,6 @@ static int nfa_gen_dot_fd(NFA nfa, int fd)
     NSTATE *accepting_states = nfa_get_accepting_states(nfa);
     size_t accepting_states_sz = nfa_count_accepting_states(nfa);
     gen_list(fd, (void**) accepting_states, accepting_states_sz, map);
-    free(accepting_states);
 
     // generate the declaration for any following states
     gen_message(fd, "node [shape=circle];");
@@ -185,8 +187,14 @@ static int nfa_gen_dot_fd(NFA nfa, int fd)
     }
     free(all_states);
 
+    // gen the footer
+    gen_message(fd, dot_footer);
+    // gen the list of accepting states again
+    gen_list(fd, (void**) accepting_states, accepting_states_sz, map);
+    free(accepting_states);
+
     // generate the ending
-    gen_message(fd, "}");
+    gen_message(fd, "}}");
 
     id_map_free(map);
     return 0;
@@ -246,6 +254,7 @@ static void dstate_assign_id(DSTATE state, ID_MAP map)
         if (!ptrmap_contains_key(map->map, to))
             dstate_assign_id(to, map);
     }
+    free(symbols);
 }
 
 static int dfa_gen_dot_fd(DFA dfa, int fd)
@@ -260,7 +269,6 @@ static int dfa_gen_dot_fd(DFA dfa, int fd)
     DSTATE *accepting_states = dfa_get_accepting_states(dfa);
     size_t accepting_states_sz = dfa_count_accepting_states(dfa);
     gen_list(fd, (void**) accepting_states, accepting_states_sz, map);
-    free(accepting_states);
 
     // generate the declaration for any following states
     gen_message(fd, "node [shape=circle];");
@@ -291,8 +299,14 @@ static int dfa_gen_dot_fd(DFA dfa, int fd)
     }
     free(all_states);
 
+    // gen the footer
+    gen_message(fd, dot_footer);
+    // gen the list of accepting states again
+    gen_list(fd, (void**) accepting_states, accepting_states_sz, map);
+    free(accepting_states);
+
     // generate the ending
-    gen_message(fd, "}");
+    gen_message(fd, "}}");
 
     id_map_free(map);
     return 0;
