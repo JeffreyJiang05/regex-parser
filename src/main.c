@@ -11,29 +11,6 @@ int main()
     char *nfa_output_fn = "NFA.png";
     char *dfa_output_fn = "DFA.png";
 
-    // REGEX FOR (a|b)*abb
-    /* NFA_COMPONENT builder = nfa_concat(
-        nfa_repeat_min(
-            nfa_union(
-                nfa_concat(
-                    nfa_symbol('a'),
-                    nfa_symbol('b')
-                ),
-                nfa_concat(
-                    nfa_symbol('c'),
-                    nfa_symbol('d')
-                )
-            ),
-        2),
-        nfa_concat(
-            nfa_symbol('d'),
-            nfa_concat(
-                nfa_symbol('c'),
-                nfa_symbol('b')
-            )
-        )
-    ); */
-
     NFA_COMPONENT builder = NFA_CONCAT_MANY(
         NFA_REPEAT_MIN(
             NFA_UNION(

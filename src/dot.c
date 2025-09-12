@@ -4,6 +4,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <ctype.h>
+#include <signal.h>
 #include <sys/wait.h>
 
 #include "utility/ptrmap.h"
@@ -202,7 +203,7 @@ static int nfa_gen_dot_fd(NFA nfa, int fd)
 
 int nfa_gen_dot(NFA nfa, char *filename)
 {
-    int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0333);
+    int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0777);
     nfa_gen_dot_fd(nfa, fd);
     close(fd);
     return 0;
@@ -216,12 +217,17 @@ int nfa_gen_img(NFA nfa, char *filename)
     if (ret != 0) return ret;
 
     pid_t pid = fork();
-    if (pid) // parent
+    if (pid == -1) return -1;
+    else if (pid) // parent
     {
         close(comm[0]); // close the read end
         nfa_gen_dot_fd(nfa, comm[1]); // write the data
         close(comm[1]); // now close this end since we are done
-        wait(NULL);
+        
+        int status;
+        waitpid(pid, &status, 0);
+        if (WIFSIGNALED(status)) return -1;
+        return 0; // success
     }
     else // child 
     {
@@ -236,9 +242,87 @@ int nfa_gen_img(NFA nfa, char *filename)
             filename,
             NULL
         };
-        execvp(command, args);
+        ret = execvp(command, args);
+        if (ret != 0) raise(SIGKILL);
     }
-    return 0;
+    return -1;
+}
+
+int nfa_display(NFA nfa)
+{
+    int ret;
+    pid_t dot_pid, display_pid;
+    int exec_dot_pipe[2], dot_display_pipe[2];
+
+    ret = pipe(exec_dot_pipe);
+    if (ret != 0) return ret;
+
+    ret = pipe(dot_display_pipe);
+    if (ret != 0) return ret;
+
+    dot_pid = fork();
+    if (dot_pid == -1) return dot_pid;
+    else if (dot_pid) // exec process
+    {
+        display_pid = fork();
+        if (display_pid == -1) kill(dot_pid, SIGKILL); // kill child
+        else if (!display_pid) // display process
+        {
+            // close read/write pipe of exec_dot_pipe
+            close(exec_dot_pipe[0]);
+            close(exec_dot_pipe[1]);
+            // close write side of dot_display_pipe
+            close(dot_display_pipe[1]);
+            // redirect read side to STDIN
+            dup2(dot_display_pipe[0], STDIN_FILENO);
+
+            char *command = "display";
+            char *args[] = { command, NULL };
+            ret = execvp(command, args);
+            if (ret != 0) raise(SIGKILL); 
+        }
+
+        // close read/write of dot_display_pipe
+        close(dot_display_pipe[0]);
+        close(dot_display_pipe[1]);
+        // close read side of exec_dot_pipe
+        close(exec_dot_pipe[0]);
+        nfa_gen_dot_fd(nfa, exec_dot_pipe[1]);
+        // close write side now that we are done with it
+        close(exec_dot_pipe[1]); 
+
+        // now we wait for the children to finish
+        int status;
+        waitpid(dot_pid, &status, 0);
+        if (WIFSIGNALED(status)) // an error has occurred
+        {
+            kill(display_pid, SIGKILL); // kill the display child
+            return -1;
+        }       
+
+        waitpid(display_pid, &status, 0);
+        if (WIFSIGNALED(status)) return -1;
+
+        // otherwise, we are successful
+        return 0;
+    }
+    else // dot process
+    {
+        // close write side of exec_dot_pipe
+        close(exec_dot_pipe[1]);
+        // close read size of dot_display_pipe
+        close(dot_display_pipe[0]);
+        // redirect read side of exec_dot_pipe to STDIN
+        dup2(exec_dot_pipe[0], STDIN_FILENO);
+        // redirect write side of dot_display_pipe to STDOUT
+        dup2(dot_display_pipe[1], STDOUT_FILENO);
+
+        char *command = "dot";
+        char *args[] = { command, "-Tpng", NULL };
+        ret = execvp(command, args);
+        if (ret != 0) raise(SIGKILL);
+    }
+    return -1;
 }
 
 static void dstate_assign_id(DSTATE state, ID_MAP map)
@@ -314,7 +398,7 @@ static int dfa_gen_dot_fd(DFA dfa, int fd)
 
 int dfa_gen_dot(DFA dfa, char *filename)
 {
-    int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0333);
+    int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0777);
     dfa_gen_dot_fd(dfa, fd);
     close(fd);
     return 0;
@@ -328,12 +412,17 @@ int dfa_gen_img(DFA dfa, char *filename)
     if (ret != 0) return ret;
 
     pid_t pid = fork();
-    if (pid) // parent
+    if (pid == -1) return -1;
+    else if (pid) // parent
     {
         close(comm[0]); // close the read end
         dfa_gen_dot_fd(dfa, comm[1]); // write the data
         close(comm[1]); // now close this end since we are done
-        wait(NULL);
+        
+        int status;
+        waitpid(pid, &status, 0);
+        if (WIFSIGNALED(status)) return -1;
+        return 0; // success
     }
     else // child 
     {
@@ -348,7 +437,85 @@ int dfa_gen_img(DFA dfa, char *filename)
             filename,
             NULL
         };
-        execvp(command, args);
+        ret = execvp(command, args);
+        if (ret != 0) raise(SIGKILL);
     }
-    return 0;
+    return -1;
+}
+
+int dfa_display(DFA dfa)
+{
+    int ret;
+    pid_t dot_pid, display_pid;
+    int exec_dot_pipe[2], dot_display_pipe[2];
+
+    ret = pipe(exec_dot_pipe);
+    if (ret != 0) return ret;
+
+    ret = pipe(dot_display_pipe);
+    if (ret != 0) return ret;
+
+    dot_pid = fork();
+    if (dot_pid == -1) return dot_pid;
+    else if (dot_pid) // exec process
+    {
+        display_pid = fork();
+        if (display_pid == -1) kill(dot_pid, SIGKILL); // kill child
+        else if (!display_pid) // display process
+        {
+            // close read/write pipe of exec_dot_pipe
+            close(exec_dot_pipe[0]);
+            close(exec_dot_pipe[1]);
+            // close write side of dot_display_pipe
+            close(dot_display_pipe[1]);
+            // redirect read side to STDIN
+            dup2(dot_display_pipe[0], STDIN_FILENO);
+
+            char *command = "display";
+            char *args[] = { command, NULL };
+            ret = execvp(command, args);
+            if (ret != 0) raise(SIGKILL); 
+        }
+
+        // close read/write of dot_display_pipe
+        close(dot_display_pipe[0]);
+        close(dot_display_pipe[1]);
+        // close read side of exec_dot_pipe
+        close(exec_dot_pipe[0]);
+        dfa_gen_dot_fd(dfa, exec_dot_pipe[1]);
+        // close write side now that we are done with it
+        close(exec_dot_pipe[1]); 
+
+        // now we wait for the children to finish
+        int status;
+        waitpid(dot_pid, &status, 0);
+        if (WIFSIGNALED(status)) // an error has occurred
+        {
+            kill(display_pid, SIGKILL); // kill the display child
+            return -1;
+        }       
+
+        waitpid(display_pid, &status, 0);
+        if (WIFSIGNALED(status)) return -1;
+
+        // otherwise, we are successful
+        return 0;
+    }
+    else // dot process
+    {
+        // close write side of exec_dot_pipe
+        close(exec_dot_pipe[1]);
+        // close read size of dot_display_pipe
+        close(dot_display_pipe[0]);
+        // redirect read side of exec_dot_pipe to STDIN
+        dup2(exec_dot_pipe[0], STDIN_FILENO);
+        // redirect write side of dot_display_pipe to STDOUT
+        dup2(dot_display_pipe[1], STDOUT_FILENO);
+
+        char *command = "dot";
+        char *args[] = { command, "-Tpng", NULL };
+        ret = execvp(command, args);
+        if (ret != 0) raise(SIGKILL);
+    }
+    return -1;
 }
