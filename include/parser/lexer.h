@@ -43,11 +43,22 @@ META_SYMBOL token_get_class_symbol(TOKEN tok);
 
 // ---------------------------------------------------------------------------------------------------- //
 
+typedef enum lexer_status
+{
+    SUCCESS = 0,
+    UNRECOGNIZED_TOKEN = -1,
+    UNKNOWN_ERROR = -2
+} LEXER_STATUS;
+
 typedef struct regex_lexer * LEXER;
 
 LEXER lex_init(const char *regex);
 
 void lex_fini(LEXER lexer);
+
+const char *lex_get_regex(LEXER lexer);
+
+LEXER_STATUS lex_status(LEXER lexer);
 
 TOKEN lex_peek_token(LEXER lexer);
 
