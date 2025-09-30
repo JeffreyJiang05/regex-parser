@@ -14,9 +14,11 @@ typedef struct errlogs_config
     char context_frame;
 } ERRLOGS_CONFIG;
 
+/**
+ * installs a signal handler so that logs are outputted on SIGINT
+ * installs an atexit handler so that logs are ouputted on exit
+ */
 int errlogs_install();
-
-int errlogs_uninstall();
 
 int errlogs_get_output_fd();
 
@@ -44,12 +46,12 @@ void errlogs_set_config(ERRLOGS_CONFIG *new_config, ERRLOGS_CONFIG *old_config);
 
 // REPORT FUNCTIONS
 
-int errlogs_report_warning(const char *regex, LOC loc, const char *warn_msg);
-
-int errlogs_report_error(const char *regex, LOC loc, const char *warn_msg);
+void errlogs_display();
 
 // LOG FUNCTIONS
 
-void errlogs_push_error();
+void errlogs_report_warning(const char *regex, LOC loc, const char *warn_msg);
+
+void errlogs_report_error(const char *regex, LOC loc, const char *warn_msg);
 
 #endif
