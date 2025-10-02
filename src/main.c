@@ -2,37 +2,28 @@
 
 #include "debug.h"
 
-#include "automata/nfa.h"
-#include "automata/dot.h"
-#include "automata/algorithm.h"
+#include "parser/error.h"
+#include "parser/lexer.h"
 
 int main()
 {
-    char *nfa_output_fn = "NFA.png";
-    char *dfa_output_fn = "DFA.png";
+    errlogs_install();
 
-    NFA_COMPONENT builder = NFA_CONCAT_MANY(
-        NFA_REPEAT_MIN(
-            NFA_UNION(
-                NFA_CONCAT('a', 'b'),
-                NFA_CONCAT('c', 'd')
-            ), 2
-        ),
-        'd', 'c', 'b'
-    );
+    LEXER lexer = lex_init("ABC+|**{}23[1-2]{12}-[\\t-abc12-a-Z\\w-\\d][][{}]{12,32,44}");
 
-    NFA nfa = nfa_construct(builder);
-    nfa_gen_img(nfa, nfa_output_fn);
-    printf("Generated image for NFA[%p] in %s.\n", nfa, nfa_output_fn);
+    while (lex_status(lexer) >= 0)
+    {
+        TOKEN tok = lex_peek_token(lexer);
+        LOC loc = lex_peek_token_loc(lexer);
+        if (token_get_type(tok) == END) break;
 
-    DFA dfa = subset_construction(nfa);
-    printf("Completed subset construction of NFA[%p].\n", nfa);
+        errlogs_report_warning(lex_get_regex(lexer), loc, token_get_text(tok));
 
-    dfa_gen_img(dfa, dfa_output_fn);
-    printf("Generated image for DFA[%p] in %s.\n", dfa, dfa_output_fn);
+        lex_consume_token(lexer);
+    }
+    printf("\n");
 
-    nfa_free(nfa);
-    dfa_free(dfa);
+    lex_fini(lexer);
 
     return 0;
 }

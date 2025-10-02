@@ -52,6 +52,6 @@ void errlogs_display();
 
 void errlogs_report_warning(const char *regex, LOC loc, const char *warn_msg);
 
-void errlogs_report_error(const char *regex, LOC loc, const char *warn_msg);
+void errlogs_report_error(const char *regex, LOC loc, const char *err_msg);
 
 #endif
