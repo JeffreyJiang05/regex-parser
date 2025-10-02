@@ -143,6 +143,7 @@ void lex_fini(LEXER lexer)
     while (map_iterator_has_next(iter))
     {
         map_iterator_next(iter, NULL, &token);
+        free(((TOKEN) token)->str);
         free(token);
     }
     map_iterator_fini(iter);

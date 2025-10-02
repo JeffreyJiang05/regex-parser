@@ -185,8 +185,38 @@ static struct error_node *pop_log()
 
 // REPORT FUNCTIONS
 
+static void display_header_no_color()
+{
+    char buf[64] = { 0 };
+    if (logs.config.hide_warning_enabled)
+        snprintf(buf, 64, "Reporting %u errors.\n", (unsigned) logs.error_sz);
+    else 
+        snprintf(buf, 64, "Reporting %u warnings and %u errors.\n", (unsigned) logs.warning_sz, (unsigned) logs.error_sz);
+    int len = write(logs.config.output_fd, buf, strlen(buf));
+    (void) len;
+}
+
+static void display_header_color()
+{
+    char buf[72] = { 0 };
+    if (logs.config.hide_warning_enabled)
+        snprintf(buf, 72, "Reporting \033[31m%u errors\033[0m.\n", (unsigned) logs.error_sz);
+    else 
+        snprintf(buf, 72, "Reporting \033[33m%u warnings\033[0m and \033[31m%u errors\033[0m.\n", (unsigned) logs.warning_sz, (unsigned) logs.error_sz);
+    int len = write(logs.config.output_fd, buf, strlen(buf));
+    (void) len;
+}
+
 void errlogs_display()
 {
+    if (logs.config.silent_success_enabled &&
+        logs.error_sz == 0 &&
+        (logs.config.hide_warning_enabled || logs.warning_sz == 0)
+    ) return;
+
+    if (logs.config.color_diagnostic_enabled) display_header_color();
+    else display_header_no_color();
+
     struct error_node *node = NULL;
     size_t len = 0;
     while (logs.log_sz)
@@ -371,8 +401,6 @@ static void errlogs_report_error_color(const char *regex, LOC loc, const char *e
 }
 
 // LOG FUNCTIONS
-
-// TODO: FIX THIS:
 
 // 1:17 | warning: This is an error message.\n
 // \t"REGEX REGEX REGEX"
