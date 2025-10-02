@@ -13,7 +13,6 @@
 #endif
 #define DEFAULT_HIDE_WARNING 0
 #define DEFAULT_SILENT_SUCCESS 0
-#define DEFAULT_CONTEXT_FRAME 5
 
 enum error_type
 {
@@ -49,7 +48,6 @@ static struct error_logs logs = {
         .color_diagnostic_enabled = DEFAULT_COLOR_DIAGNOSTIC,
         .hide_warning_enabled     = DEFAULT_HIDE_WARNING,
         .silent_success_enabled   = DEFAULT_SILENT_SUCCESS,
-        .context_frame            = DEFAULT_CONTEXT_FRAME
     }
 };
 
@@ -122,18 +120,6 @@ void errlogs_enable_silent_success()
 void errlogs_disable_silent_success()
 {
     logs.config.silent_success_enabled = 0;
-}
-
-int errlogs_get_context_frame()
-{
-    return logs.config.context_frame;
-}
-
-int errlogs_set_context_frame(int frame)
-{
-    int old_context = logs.config.context_frame;
-    logs.config.context_frame = frame;
-    return old_context;
 }
 
 void errlogs_get_config(ERRLOGS_CONFIG *config)
