@@ -98,6 +98,7 @@ struct regex_lexer
     char range_context; 
     TOKEN peek_token;
     LOC peek_loc;
+    LEXER_CONFIG conf;
 };
 
 LEXER lex_init(const char *regex)
@@ -114,6 +115,7 @@ LEXER lex_init(const char *regex)
     lexer->class_context = lexer->range_context = 0;
     lexer->peek_token = NULL;
     lexer->peek_loc.begin = lexer->peek_loc.end = 0;
+    lexer->conf = lexconf_init();
 
     lex_consume_token(lexer);
     return lexer;
@@ -145,9 +147,21 @@ void lex_fini(LEXER lexer)
     }
     map_iterator_fini(iter);
     map_fini(lexer->token_number_map);
-
+    lexconf_fini(lexer->conf);
     free(lexer->regex);
     free(lexer);
+}
+
+LEXER_CONFIG lex_config(LEXER lexer)
+{
+    return lexer->conf;
+}
+
+void lex_config_set(LEXER lexer, LEXER_CONFIG config)
+{
+    if (!lexer || !config) return;
+    lexconf_fini(lexer->conf);
+    lexer->conf = config;
 }
 
 const char *lex_get_regex(LEXER lexer)
@@ -193,9 +207,9 @@ int lex_peek_token_is_impl(LEXER lexer, size_t count, ...)
     return 0;
 }
 
-#define UPDATE_LEXER_CURR(lexer, curr)  \
-do {                                    \
-    lexer->curr = curr;                 \
+#define UPDATE_LEXER_CURR(lexer, current)  \
+do {                                       \
+    lexer->curr = current;                 \
 } while (0)
 
 #define UPDATE_LEXER_TOKEN(lexer, token, current, tok_begin, tok_end) \
@@ -205,7 +219,7 @@ do {                                                \
     lexer->curr = current;                          \
 } while (0) 
 
-#define UPDATE_LEXER_STATE(lexer, class_ctx, range_ctx)  \
+#define UPDATE_LEXER_STATE(lexer, class_ctx, range_ctx)             \
 do {                                                                \
     if ((class_ctx) != -1) lexer->class_context = class_ctx;        \
     if ((range_ctx) != -1) lexer->range_context = range_ctx;        \
@@ -290,26 +304,32 @@ static void gen_ctx_next_tok(LEXER lexer)
         case 'w':
             UPDATE_LEXER_TOKEN(lexer, &WordClassToken, curr, start, curr); break;
         case 0:
-            #if PARSE_CONFIG(ERROR_ON_UNRECOGNIZED_ESCAPED_SEQUENCE)
-                lexer->status = LEX_UNRECOGNIZED_TOKEN;
-                errlogs_report_error(lexer->regex, (LOC){ start, curr - 1 }, "No character following escape character!" );
-            #else
+            if (lexconf_get(lexer->conf, IGN_UNKNOWN_ESC_SEQ))
+            {
                 lexer->status = LEX_WARNING;
                 errlogs_report_warning(lexer->regex, (LOC){ start, curr - 1 }, "No character following escape character! Ignoring.");
                 UPDATE_LEXER_CURR(lexer, curr);
-            #endif
+            }
+            else
+            {
+                lexer->status = LEX_UNRECOGNIZED_TOKEN;
+                errlogs_report_error(lexer->regex, (LOC){ start, curr - 1 }, "No character following escape character!" );
+            }
             break;
         default:
-            #if PARSE_CONFIG(ERROR_ON_UNRECOGNIZED_ESCAPED_SEQUENCE)
-                lexer->status = LEX_UNRECOGNIZED_TOKEN;
-                errlogs_report_error(lexer->regex, (LOC){ start, curr }, "Unrecognized escaped sequence!" );
-            #else
+            if (lexconf_get(lexer->conf, IGN_UNKNOWN_ESC_SEQ))
+            {
                 lexer->status = LEX_WARNING;
                 errlogs_report_warning(lexer->regex, (LOC){ start, curr }, "Unrecognized escaped sequence. Ignoring.");
                 UPDATE_LEXER_CURR(lexer, curr);
                 // we attempt to find the next token after the invalid escape sequence!
                 gen_ctx_next_tok(lexer);
-            #endif
+            }
+            else
+            {
+                lexer->status = LEX_UNRECOGNIZED_TOKEN;
+                errlogs_report_error(lexer->regex, (LOC){ start, curr }, "Unrecognized escaped sequence!" );
+            }
         }
     }
     else if (isprint(c))
@@ -321,14 +341,18 @@ static void gen_ctx_next_tok(LEXER lexer)
             UPDATE_LEXER_STATE(lexer, 1, 0);
             break;
         case ']':
-            #if PARSE_CONFIG(TREAT_UNEXPECTED_TOKENS_AS_ESCAPED)
+            // #if PARSE_CONFIG(TREAT_UNEXPECTED_TOKENS_AS_ESCAPED)
+            if (lexconf_get(lexer->conf, TREAT_UNEXPECTED_TOK_AS_ESC))
+            {
                 lexer->status = LEX_WARNING;
                 errlogs_report_warning(lexer->regex, (LOC){ start, curr }, "Unexpected token. Treating as if escaped.");
                 UPDATE_LEXER_TOKEN(lexer, &EscapedRBracketToken, curr, start, curr);
-            #else
+            }
+            else
+            {
                 // propagate it so it becomes an syntactic error not a lexical error
                 UPDATE_LEXER_TOKEN(lexer, &RBracketToken, curr, start, curr);
-            #endif
+            }
             break;
         case '(':
             UPDATE_LEXER_TOKEN(lexer, &LParenToken, curr, start, curr);
@@ -341,14 +365,17 @@ static void gen_ctx_next_tok(LEXER lexer)
             UPDATE_LEXER_STATE(lexer, 0, 1);
             break;
         case '}':
-            #if PARSE_CONFIG(TREAT_UNEXPECTED_TOKENS_AS_ESCAPED)
+            if (lexconf_get(lexer->conf, TREAT_UNEXPECTED_TOK_AS_ESC))
+            {
                 lexer->status = LEX_WARNING;
                 errlogs_report_warning(lexer->regex, (LOC){ start, curr }, "Unexpected token. Treating as if escaped.");
                 UPDATE_LEXER_TOKEN(lexer, &EscapedRBraceToken, curr, start, curr);
-            #else
+            }
+            else
+            {
                 // propagate it so it becomes an syntactic error not a lexical error
                 UPDATE_LEXER_TOKEN(lexer, &RBraceToken, curr, start, curr);
-            #endif
+            }
             break;
         case '*':
             UPDATE_LEXER_TOKEN(lexer, &AsteriskToken, curr, start, curr);
@@ -368,24 +395,22 @@ static void gen_ctx_next_tok(LEXER lexer)
             UPDATE_LEXER_TOKEN(lexer, tok, curr, start, curr);
             break;
         }
-
-        (void) MinusToken;
-        (void) CommaToken;
-        (void) RBracketToken;
-        (void) RParenToken;
-        (void) RBraceToken;
     }
     else
     {
-        #if PARSE_CONFIG(IGNORE_NONPRINTABLE_REGEX_CHAR)
+        // #if PARSE_CONFIG(IGNORE_NONPRINTABLE_REGEX_CHAR)
+        if (lexconf_get(lexer->conf, IGN_NONPRINT_REGEX_SYM))
+        {
             lexer->status = LEX_WARNING;
             errlogs_report_warning(lexer->regex, (LOC){ start, curr }, "Nonprintable character in regular expression. Ignoring.");
             UPDATE_LEXER_CURR(lexer, curr + 1);
             gen_ctx_next_tok(lexer);
-        #else
+        }
+        else
+        {
             lexer->status = LEX_UNRECOGNIZED_SYMBOL;
             errlogs_report_error(lexer->regex, (LOC){ start, curr }, "Nonprintable character in regular expression.");
-        #endif
+        }
     }
 }
 
@@ -452,26 +477,32 @@ static void class_ctx_next_tok(LEXER lexer)
             UPDATE_LEXER_TOKEN(lexer, &WordClassToken, curr, start, curr); break;
         // HANDLE TRAILING BLACKSLASH
         case 0:
-            #if PARSE_CONFIG(ERROR_ON_UNRECOGNIZED_ESCAPED_SEQUENCE)
-                lexer->status = LEX_UNRECOGNIZED_TOKEN;
-                errlogs_report_error(lexer->regex, (LOC){ start, curr - 1 }, "No character following escape character!" );
-            #else
+            if (lexconf_get(lexer->conf, IGN_UNKNOWN_ESC_SEQ))
+            {
                 lexer->status = LEX_WARNING;
                 errlogs_report_warning(lexer->regex, (LOC){ start, curr - 1 }, "No character following escape character! Ignoring.");
                 UPDATE_LEXER_CURR(lexer, curr);
-            #endif
+            }
+            else
+            {
+                lexer->status = LEX_UNRECOGNIZED_TOKEN;
+                errlogs_report_error(lexer->regex, (LOC){ start, curr - 1 }, "No character following escape character!" );
+            }
             break;
         default:
-            #if PARSE_CONFIG(ERROR_ON_UNRECOGNIZED_ESCAPED_SEQUENCE)
-                lexer->status = LEX_UNRECOGNIZED_TOKEN;
-                errlogs_report_error(lexer->regex, (LOC){ start, curr }, "Unrecognized escaped sequence!" );
-            #else
+            if (lexconf_get(lexer->conf, IGN_UNKNOWN_ESC_SEQ))
+            {
                 lexer->status = LEX_WARNING;
                 errlogs_report_warning(lexer->regex, (LOC){ start, curr }, "Unrecognized escaped sequence. Ignoring.");
                 UPDATE_LEXER_CURR(lexer, curr);
                 // we attempt to find the next token after the invalid escape sequence!
                 class_ctx_next_tok(lexer);
-            #endif   
+            }
+            else
+            {
+                lexer->status = LEX_UNRECOGNIZED_TOKEN;
+                errlogs_report_error(lexer->regex, (LOC){ start, curr }, "Unrecognized escaped sequence!" );
+            }
         }
     }
     else if (isprint(c))
@@ -485,34 +516,42 @@ static void class_ctx_next_tok(LEXER lexer)
             UPDATE_LEXER_TOKEN(lexer, &LParenToken, curr, start, curr);
             break;
         case ')':
-            #if PARSE_CONFIG(TREAT_UNEXPECTED_TOKENS_AS_ESCAPED)
+            if (lexconf_get(lexer->conf, TREAT_UNEXPECTED_TOK_AS_ESC))
+            {
                 lexer->status = LEX_WARNING;
                 errlogs_report_warning(lexer->regex, (LOC){ start, curr }, "Unexpected token in character class. Treating as if escaped.");
                 UPDATE_LEXER_TOKEN(lexer, &EscapedRParenToken, curr, start, curr);
-            #else
+            }
+            else
+            {
                 // propagate it so it becomes an syntactic error not a lexical error
                 UPDATE_LEXER_TOKEN(lexer, &RParenToken, curr, start, curr);
-            #endif
+            }
             break;
         case '{':
-            #if PARSE_CONFIG(TREAT_UNEXPECTED_TOKENS_AS_ESCAPED)
+            if (lexconf_get(lexer->conf, TREAT_UNEXPECTED_TOK_AS_ESC))
+            {
                 lexer->status = LEX_WARNING;
                 errlogs_report_warning(lexer->regex, (LOC){ start, curr }, "Unexpected token in character class. Treating as if escaped.");
                 UPDATE_LEXER_TOKEN(lexer, &EscapedLBraceToken, curr, start, curr);
-            #else
+            }
+            else
+            {
                 // propagate it so it becomes an syntactic error not a lexical error
                 UPDATE_LEXER_TOKEN(lexer, &LBraceToken, curr, start, curr);
-            #endif
+            }
             break;
         case '}':
-            #if PARSE_CONFIG(TREAT_UNEXPECTED_TOKENS_AS_ESCAPED)
+            if (lexconf_get(lexer->conf, TREAT_UNEXPECTED_TOK_AS_ESC))
+            {
                 lexer->status = LEX_WARNING;
                 errlogs_report_warning(lexer->regex, (LOC){ start, curr }, "Unexpected token in character class. Treating as if escaped.");
                 UPDATE_LEXER_TOKEN(lexer, &EscapedRBraceToken, curr, start, curr);
-            #else
-                // propagate it so it becomes an syntactic error not a lexical error
+            }
+            else
+            {
                 UPDATE_LEXER_TOKEN(lexer, &RBraceToken, curr, start, curr);
-            #endif
+            }
             break;
         case '*':
             UPDATE_LEXER_TOKEN(lexer, &AsteriskToken, curr, start, curr);
@@ -535,15 +574,18 @@ static void class_ctx_next_tok(LEXER lexer)
     }
     else
     {
-        #if PARSE_CONFIG(IGNORE_NONPRINTABLE_REGEX_CHAR)
+        if (lexconf_get(lexer->conf, IGN_NONPRINT_REGEX_SYM))
+        {
             lexer->status = LEX_WARNING;
             errlogs_report_warning(lexer->regex, (LOC){ start, curr }, "Nonprintable character in regular expression. Ignoring.");
             UPDATE_LEXER_CURR(lexer, curr + 1);
             class_ctx_next_tok(lexer);
-        #else
+        }
+        else
+        {
             lexer->status = LEX_UNRECOGNIZED_SYMBOL;
             errlogs_report_error(lexer->regex, (LOC){ start, curr }, "Nonprintable character in regular expression.");
-        #endif
+        }
     }
 }
 
