@@ -23,8 +23,14 @@ TEST_LIBS := -lcriterion
 
 CFLAGS += $(STD) $(POSIX) $(BSD) $(GNU)
 
-SRCF := $(shell find $(SOURCE) -type f -name *.c)
+define remove_slashes
+  $(shell echo $(subst /,.,$1) | sed 's/\./\//')
+endef
+
+SRCF := $(shell find src/ -type f -name '*.c')
 OBJF := $(patsubst $(SOURCE)%,$(BUILD)%,$(SRCF:.c=.o))
+OBJF := $(foreach f, $(OBJF), $(call remove_slashes, $(f)))
+OBJF_COUNT := $(words $(OBJF))
 FUNCF := $(filter-out $(BUILD)main.o, $(OBJF))
 TESTF := $(shell find $(TEST) -type f -name *.c)
 
@@ -48,14 +54,17 @@ $(BUILD):
 	mkdir -p $(BUILD)
 
 $(BIN)$(EXEC): $(OBJF)
-	echo $(SRCF)
 	$(CC) $^ -o $@ $(LIBS)
 
 $(BIN)$(TEST_EXEC): $(FUNCF) $(TESTF)
 	$(CC) $(CFLAGS) $(INC) $(FUNCF) $(TESTF) $(TEST_LIBS) $(LIBS) -o $@
 
-$(BUILD)%.o: $(SOURCE)%.c
-	$(CC) $(CFLAGS) $(INC) -c $< -o $@
+define BUILD_RECIPE_TEMPLATE
+$1: $2
+	$$(CC) $$(CFLAGS) $$(INC) -c $$< -o $$@
+endef
+$(foreach i, $(shell seq $(OBJF_COUNT)), \
+		$(eval $(call BUILD_RECIPE_TEMPLATE, $(word $(i), $(OBJF)), $(word $(i), $(SRCF))) ))
 
 clean:
 	rm -rfv $(BUILD) $(BIN)
