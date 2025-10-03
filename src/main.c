@@ -10,7 +10,7 @@ int main()
     errlogs_install();
     errlogs_enable_silent_success();
 
-    LEXER lexer = lex_init("ABC+|**{}23[1-2]{12}-[\\t-abc12-a-Z\\w-\\d][][{}]{12,32,44}");
+    LEXER lexer = lex_init("[a-zA-Z][a-zA-Z0-9]*");
 
     while (lex_status(lexer) >= 0)
     {
