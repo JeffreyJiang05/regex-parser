@@ -1,6 +1,8 @@
 #ifndef PARSER_AST_H
 #define PARSER_AST_H
 
+#include <stdarg.h>
+
 #include "macro.h"
 
 #include "parser/lexer.h"
@@ -23,34 +25,10 @@
  *           ASTCharRange
  *      ASTList
  *           ASTCharClass
- */
-
- /**
-  * runtime type information (RTTI) for
-  * the types
-  */
-typedef enum
-{
-    TYPE_ASTNode,
-    TYPE_ASTSymbol,
-    TYPE_ASTClassSymbol,
-    TYPE_ASTUnaryOp,
-    TYPE_ASTGroup,
-    TYPE_ASTRange,
-    TYPE_ASTBinaryOp,
-    TYPE_ASTConcat,
-    TYPE_ASTUnion,
-    TYPE_ASTCharRange,
-    TYPE_ASTList,
-    TYPE_ASTCharClass
-} AST_RTTI;
-
-#define RTTI(handle) PRIMITIVE_CAT(TYPE_, handle)
-
-/*
-UML DIAGRAM FOR THE CLASS HEIRARCHY
+ * 
+ * UML DIAGRAM FOR THE CLASS HEIRARCHY
                                                                                  ┌───────────────────────────────┐
-                                                                                 │ [I] AST_NODE                  │
+                                                                                 │ [I] ASTNode                   │
                                                                                  ├───────────────────────────────┤
                                                                                  │+ NFA_COMPONENT emit()         │
                                                                                  │+ const char *print(int indent)│
@@ -58,8 +36,8 @@ UML DIAGRAM FOR THE CLASS HEIRARCHY
                                                                                            ┇  ┇  ┇  ┇  ┗╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍┓
              ┎╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍┚  ┇  ┇  ┗╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍┓                                                          ┇
              ┇                                        ┎╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍┚  ┇                  ┌────────────────────────────┸─────────────────────────────┐   ┌────────────────────────┸───────────────────────┐
-┌────────────┸──────────────┐  ┌──────────────────────┸──────────────────────┐   ┌───────────────┸──────────────┐   │ [A] AST_BINARY_OP                                        │   │ [A] AST_LIST                                   │
-│ [C] AST_SYMBOL            │  │ [C] AST_CLASS_SYMBOL                        │   │ [A] AST_UNARY_OP             │   ├──────────────────────────────────────────────────────────┤   ├────────────────────────────────────────────────┤
+┌────────────┸──────────────┐  ┌──────────────────────┸──────────────────────┐   ┌───────────────┸──────────────┐   │ [A] ASTBinaryOp                                          │   │ [A] ASTList                                    │
+│ [C] ASTSymbol             │  │ [C] ASTClassSymbol                          │   │ [A] ASTUnaryOp               │   ├──────────────────────────────────────────────────────────┤   ├────────────────────────────────────────────────┤
 ├───────────────────────────┤  ├─────────────────────────────────────────────┤   ├──────────────────────────────┤   │+ AST_BINARY_OP(AST_NODE left_child, AST_NODE right_child)│   │+ AST_LIST(size_t list_len, AST_NODE children[])│
 │+ AST_SYMBOL(SYMBOL symbol)│  │+ AST_META_SYMBOL(CLASS_SYMBOL_TYPE meta_sym)│   │+ AST_UNARY_OP(AST_NODE child)│   │+ AST_NODE get_left_child()                               │   │+ size_t get_num_of_children()                  │
 │+ SYMBOL get_sym()         │  │+ CLASS_SYMBOL_TYPE get_class_sym()          │   │+ AST_NODE get_child()        │   │+ AST_NODE get_right_child()                              │   │+ AST_NODE *get_children()                      │
@@ -67,7 +45,7 @@ UML DIAGRAM FOR THE CLASS HEIRARCHY
                                                                                               ┃  ┃                            ┃                  ┃                  ┃              └───────────────────────┰────────────────────────┘
                                                                         ┎─────────────────────┚  ┃                            ┃                  ┃                  ┃                                      ┃
                                                           ┌─────────────┸────────────┐   ┌───────┸───────┐           ┌────────┸───────┐ ┌────────┸──────┐ ┌─────────┸──────────┐                 ┌─────────┸──────────┐
-                                                          │ [C] AST_Range            │   │ [C] AST_GROUP │           │ [C] AST_CONCAT │ │ [C] AST_UNION │ │ [C] AST_CHAR_RANGE │                 │ [C] AST_CHAR_CLASS |
+                                                          │ [C] ASTRange             │   │ [C] ASTGroup  │           │ [C] ASTConcat  │ │ [C] ASTUnion  │ │ [C] ASTCharRange   │                 │ [C] ASTCharClass   |
                                                           ├──────────────────────────┤   └───────────────┘           └────────────────┘ └───────────────┘ └────────────────────┘                 └────────────────────┘
                                                           │+ size_t get_lower_range()│
                                                           |+ size_t get_upper_range()|
@@ -117,11 +95,45 @@ size_t ast_get_lower_range(void *node /* AST_RANGE */);
 
 size_t ast_get_upper_range(void *node /* AST_RANGE */);
 
+// --------------------------------------------------------------------------------- //
+// INTERNAL INFORMATION
+
+ /**
+  * runtime type information (RTTI) for
+  * the types
+  */
+typedef enum
+{
+    TYPE_ASTNode,
+    TYPE_ASTSymbol,
+    TYPE_ASTClassSymbol,
+    TYPE_ASTUnaryOp,
+    TYPE_ASTGroup,
+    TYPE_ASTRange,
+    TYPE_ASTBinaryOp,
+    TYPE_ASTConcat,
+    TYPE_ASTUnion,
+    TYPE_ASTCharRange,
+    TYPE_ASTList,
+    TYPE_ASTCharClass
+} AST_RTTI;
+
+#define RTTI(handle) PRIMITIVE_CAT(TYPE_, handle)
+
 // DEFINE THE VTABLE TYPES AND OBJECTS 
 
-typedef void *(*AST_CONSTRUCTOR)(...);
+#define VTABLE()
+#define INHERIT() VTABLE_DECL
+#define VTABLE_DECL(tag) PRIMITIVE_CAT(tag, _VTABLE_DECL)
+#define FROM ()()
+
+// INHERIT DATA FROM
+
+#define void_VTABLE_DECL void
+
+typedef void *(*AST_CONSTRUCTOR)(va_list);
 typedef void (*AST_DESTRUCTOR)(void *_this);
-#define AST_NODE_VTABLE_DECL                                \
+#define ASTNode_VTABLE_DECL                                 \
 struct                                                      \
 {                                                           \
     AST_RTTI type;                                          \
@@ -131,106 +143,109 @@ struct                                                      \
     NFA_COMPONENT (*emit)(void *_this);                     \
     void (*print)(int);                                     \
 }
-extern AST_NODE_VTABLE_DECL ASTNode;
 
-#define AST_SYMBOL_VTABLE_DECL                              \
+#define ASTSymbol_VTABLE_DECL                               \
 struct                                                      \
 {                                                           \
-    AST_NODE_VTABLE_DECL;                                   \
-    AST_NODE_VTABLE_DECL *super;                            \
+    INHERIT VTABLE FROM(ASTNode);                           \
     SYMBOL (*get_sym)(void *_this);                         \
 }
-extern AST_SYMBOL_VTABLE_DECL ASTSymbol;
 
-#define AST_CLASS_SYMBOL_VTABLE_DECL                        \
+#define ASTClassSymbol_VTABLE_DECL                          \
 struct                                                      \
 {                                                           \
-    AST_NODE_VTABLE_DECL;                                   \
-    AST_NODE_VTABLE_DECL *super;                            \
+    INHERIT VTABLE FROM(ASTNode);                           \
     CLASS_SYMBOL_TYPE (*get_class_sym)(void *_this);        \
 }
-extern AST_CLASS_SYMBOL_VTABLE_DECL ASTClassSymbol;
 
-#define AST_UNARY_OP_VTABLE_DECL                            \
+#define ASTUnaryOp_VTABLE_DECL                              \
 struct                                                      \
 {                                                           \
-    AST_NODE_VTABLE_DECL;                                   \
-    AST_NODE_VTABLE_DECL *super;                            \
+    INHERIT VTABLE FROM(ASTNode);                           \
     AST_NODE (*get_child)(void *_this);                     \
 }
-extern AST_UNARY_OP_VTABLE_DECL ASTUnaryOp;
 
-#define AST_BINARY_OP_VTABLE_DECL                           \
+#define ASTBinaryOp_VTABLE_DECL                             \
 struct                                                      \
 {                                                           \
-    AST_NODE_VTABLE_DECL;                                   \
-    AST_NODE_VTABLE_DECL *super;                            \
+    INHERIT VTABLE FROM(ASTNode);                           \
     AST_NODE (*get_left_child)(void *_this);                \
     AST_NODE (*get_right_child)(void *_this);               \
 }
-extern AST_BINARY_OP_VTABLE_DECL ASTBinaryOp;
 
-#define AST_LIST_VTABLE_DECL                                \
+#define ASTList_VTABLE_DECL                                 \
 struct                                                      \
 {                                                           \
-    AST_NODE_VTABLE_DECL;                                   \
-    AST_NODE_VTABLE_DECL *super;                            \
+    INHERIT VTABLE FROM(ASTNode);                           \
     size_t (*get_num_of_children)(void *_this);             \
     AST_NODE *(*get_children)(void *_this);                 \
     AST_NODE (*get_nth_child)(void *_this, size_t index);   \
 }
-extern AST_LIST_VTABLE_DECL ASTList;
 
-#define AST_RANGE_VTABLE_DECL                               \
+#define ASTRange_VTABLE_DECL                                \
 struct                                                      \
 {                                                           \
-    AST_UNARY_OP_VTABLE_DECL;                               \
-    AST_UNARY_OP_VTABLE_DECL *super;                        \
+    INHERIT VTABLE FROM(ASTUnaryOp);                        \
     size_t (*get_upper_range)(void *_this);                 \
     size_t (*get_lower_range)(void *_this);                 \
 }
-extern AST_RANGE_VTABLE_DECL ASTRange;
 
-#define AST_GROUP_VTABLE_DECL                               \
+#define ASTGroup_VTABLE_DECL                                \
 struct                                                      \
 {                                                           \
-    AST_UNARY_OP_VTABLE_DECL;                               \
-    AST_UNARY_OP_VTABLE_DECL *super;                        \
+    INHERIT VTABLE FROM(ASTUnaryOp);                        \
 }
-extern AST_GROUP_VTABLE_DECL ASTGroup;
 
-#define AST_CONCAT_VTABLE_DECL                              \
+#define ASTConcat_VTABLE_DECL                               \
 struct                                                      \
 {                                                           \
-    struct ast_binary_op_vtable;                            \
-    struct ast_binary_op_vtable *super;                     \
+    INHERIT VTABLE FROM(ASTBinaryOp);                       \
 }
-extern AST_CONCAT_VTABLE_DECL ASTConcat;                    
 
-#define AST_UNION_VTABLE_DECL                               \
+#define ASTUnion_VTABLE_DECL                                \
 struct                                                      \
 {                                                           \
-    struct ast_binary_op_vtable;                            \
-    struct ast_binary_op_vtable *super;                     \
+    INHERIT VTABLE FROM(ASTBinaryOp);                       \
 }
-extern AST_UNION_VTABLE_DECL ASTUnion;
 
-#define AST_CHAR_RANGE_VTABLE_DECL                          \
+#define ASTCharRange_VTABLE_DECL                            \
 struct                                                      \
 {                                                           \
-    struct ast_binary_op_vtable;                            \
-    struct ast_binary_op_vtable *super;                     \
+    INHERIT VTABLE FROM(ASTBinaryOp);                       \
 }
-extern AST_CHAR_RANGE_VTABLE_DECL ASTCharRange;
 
-#define AST_CHAR_CLASS_VTABLE_DECL                          \
+#define ASTCharClass_VTABLE_DECL                            \
 struct                                                      \
 {                                                           \
-    struct ast_binary_op_vtable;                            \
-    struct ast_binary_op_vtable *super;                     \
+    INHERIT VTABLE FROM(ASTList);                           \
 }
-extern AST_CHAR_CLASS_VTABLE_DECL ASTCharClass;
 
-#define super(_this) ((_this)->_vptr->super)
+
+
+#define DECLARE_AST_VTABLE_HELPER(type, superclass)  \
+struct { VTABLE_DECL(type); VTABLE_DECL(superclass) *super; }
+
+#define AST_VTABLE(type, superclass) EVAL(DECLARE_AST_VTABLE_HELPER(type, superclass))
+
+#define DECLARE_AST_CLASS_HANDLER(type, superclass) \
+extern AST_VTABLE(type, superclass) type
+
+DECLARE_AST_CLASS_HANDLER(ASTNode, void);
+DECLARE_AST_CLASS_HANDLER(ASTSymbol, ASTNode);
+DECLARE_AST_CLASS_HANDLER(ASTClassSymbol, ASTNode);
+DECLARE_AST_CLASS_HANDLER(ASTUnaryOp, ASTNode);
+DECLARE_AST_CLASS_HANDLER(ASTGroup, ASTUnaryOp);
+DECLARE_AST_CLASS_HANDLER(ASTRange, ASTUnaryOp);
+DECLARE_AST_CLASS_HANDLER(ASTBinaryOp, ASTNode);
+DECLARE_AST_CLASS_HANDLER(ASTConcat, ASTBinaryOp);
+DECLARE_AST_CLASS_HANDLER(ASTUnion, ASTBinaryOp);
+DECLARE_AST_CLASS_HANDLER(ASTCharRange, ASTBinaryOp);
+DECLARE_AST_CLASS_HANDLER(ASTList, ASTNode);
+DECLARE_AST_CLASS_HANDLER(ASTCharClass, ASTList);
+
+#undef VTABLE
+#undef INHERIT
+#undef VTABLE_DECL
+#undef FROM
 
 #endif

@@ -15,6 +15,7 @@
     _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, \
     N, ...) N
 
+#define DEFER(id) id EMPTY()
 #define EVAL1(...) __VA_ARGS__
 #define EVAL2(...) EVAL1(EVAL1(EVAL1(__VA_ARGS__)))
 #define EVAL3(...) EVAL2(EVAL2(EVAL2(__VA_ARGS__)))
