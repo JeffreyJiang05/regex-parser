@@ -5,24 +5,20 @@
 #include "parser/error.h"
 #include "parser/lexer.h"
 
+#include "parser/ast.h"
+
 int main()
 {
-    errlogs_install();
-    errlogs_enable_silent_success();
+    void *ast = ast_new(ASTConcat,
+        ast_new(ASTConcat, 
+            ast_new(ASTSymbol, 'a'),
+            ast_new(ASTSymbol, 'b')
+        ),
+        ast_new(ASTSymbol, 'c')
+    );
 
-    LEXER lexer = lex_init("[a-zA-Z][a-zA-Z0-9]*");
-
-    while (lex_status(lexer) >= 0)
-    {
-        TOKEN tok = lex_peek_token(lexer);
-        LOC loc = lex_peek_token_loc(lexer);
-        if (token_get_type(tok) == END) break;
-
-        errlogs_report_warning(lex_get_regex(lexer), loc, token_get_text(tok));
-
-        lex_consume_token(lexer);
-    }
-    lex_fini(lexer);
+    ast_print(ast, 0);
+    ast_delete(ast);
 
     return 0;
 }

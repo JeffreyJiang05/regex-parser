@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <signal.h>
+#include <ctype.h>
 
 // ------------------------------------------------------------------------ //
 // RTTI Functionality                                                       //
@@ -98,8 +99,8 @@ struct                                                      \
 struct                                                      \
 {                                                           \
     EXTEND VTABLE FROM(ASTUnaryOp);                         \
-    size_t (*get_upper_range)(void *_this);                 \
-    size_t (*get_lower_range)(void *_this);                 \
+    int (*get_upper_range)(void *_this);                    \
+    int (*get_lower_range)(void *_this);                    \
 }
 
 #define ASTGroup_VTABLE_DECL                                \
@@ -191,8 +192,8 @@ struct {                                \
 #define ASTRange_BODY                   \
 struct {                                \
     INHERIT DATA FROM(ASTUnaryOp);      \
-    size_t min;                         \
-    size_t max;                         \
+    int min;                            \
+    int max;                            \
 }
 
 #define ASTBinaryOp_BODY                \
@@ -262,7 +263,7 @@ do {                                                                            
     {                                                                                   \
         const VTABLE_TYPE_OF(ASTNode) *got_vtable = input_object;                       \
         const VTABLE_TYPE_OF(expected_type) *expected_vtable = expected_type;           \
-        fprintf(stderr, "[%s:%s:%d] Type Mismatch: Expected type %s but got type %s.",  \
+        fprintf(stderr, "[%s:%s:%d] Type Mismatch: Expected type %s but got type %s.\n",\
             __FILE__, __FUNCTION__, __LINE__,                                           \
             expected_vtable->type_name, got_vtable->type_name);                         \
         raise(SIGTERM);                                                                 \
@@ -275,11 +276,33 @@ do {                                                                            
     {                                                                                   \
         const VTABLE_TYPE_OF(ASTNode) *got_vtable = input_object;                       \
         const VTABLE_TYPE_OF(expected_type) *expected_vtable = expected_type;           \
-        fprintf(stderr, "[%s:%s:%d] Type Mismatch: Expected type %s but got type %s.",  \
+        fprintf(stderr, "[%s:%s:%d] Type Mismatch: Expected type %s but got type %s.\n",\
             __FILE__, __FUNCTION__, __LINE__,                                           \
             expected_vtable->type_name, got_vtable->type_name);                         \
     }                                                                                   \
 } while (0)
+
+#define ERROR_INCOMPLETE_INSTANTIATION(input_object)                                    \
+do {                                                                                    \
+    const VTABLE_TYPE_OF(ASTNode) *vptr = input_object;                                 \
+    if (!vptr->ctor)                                                                    \
+    {                                                                                   \
+        fprintf(stderr, "[%s:%s:%d] Attempting to instantiate abstract class.\n",       \
+            __FILE__, __FUNCTION__, __LINE__);                                          \
+        raise(SIGTERM);                                                                 \
+    }                                                                                   \
+} while (0)
+
+#define WARN_INCOMPLETE_INSTANTIATION(input_object)                                     \
+do {                                                                                    \
+    const VTABLE_TYPE_OF(ASTNode) *vptr = input_object;                                 \
+    if (!vptr->ctor)                                                                    \
+    {                                                                                   \
+        fprintf(stderr, "[%s:%s:%d] Attempting to instantiate abstract class.\n",       \
+            __FILE__, __FUNCTION__, __LINE__);                                          \
+    }                                                                                   \
+} while (0)
+
 
 // ------------------------------------------------------------------------ //
 // Helper functions                                                         //
@@ -305,14 +328,17 @@ static const struct type ## _VTABLE type ## _vtable
 #define DEFINE_AST_CLASS_HANDLER(type) \
 const struct type ## _VTABLE *type = & type ## _vtable
 
+#define PRINT_INDENT " | "
+
 // ------------------------------------------------------------------------ //
 // IMPLEMENTING GENERAL METHODS                                             //
 // ------------------------------------------------------------------------ //
 
-void *ast_new(void *_class, ...)
+void *ast_new(const void *_class, ...)
 {
     // allocate
     const VTABLE_TYPE_OF(ASTNode) *class = _class;
+    ERROR_INCOMPLETE_INSTANTIATION(_class);
     size_t obj_size = class->size;
     AST_NODE object = calloc(1, obj_size);
     object->_vptr = class;
@@ -325,99 +351,114 @@ void *ast_new(void *_class, ...)
     return object;
 }
 
-void ast_delete(void *node /* AST_NODE */)
+void ast_delete(void *_this /* AST_NODE */)
 {
-    const VTABLE_TYPE_OF(ASTNode) *class = node;
-    class->dtor(node);
-    free(node);
+    if (!_this) return;
+    AST_NODE this = _this;
+    const VTABLE_TYPE_OF(ASTNode) *class = this->_vptr;
+    class->dtor(this);
+    free(this);
 }
 
-int ast_isa(void *node /* AST_NODE */, const void *_class)
+int ast_isa(void *_this /* AST_NODE */, const void *_class)
 {
-    const VTABLE_TYPE_OF(ASTNode) *class = _class;
-    return class->isa(node);
+    AST_NODE this = _this;
+    const VTABLE_TYPE_OF(ASTNode) *class = this->_vptr;
+    return class->isa(this);
 }
 
-NFA_COMPONENT ast_emit(void *node /* AST_NODE */)
+NFA_COMPONENT ast_emit(void *_this /* AST_NODE */)
 {
-    const VTABLE_TYPE_OF(ASTNode) *class = node;
-    return class->emit(node);
+    AST_NODE this = _this;
+    const VTABLE_TYPE_OF(ASTNode) *class = this->_vptr;
+    return class->emit(this);
 }
 
-void ast_print(void *node /* AST_NODE */ , int indent)
+void ast_print(void *_this /* AST_NODE */ , int indent)
 {
-    const VTABLE_TYPE_OF(ASTNode) *class = node;
-    class->print(node, indent);
+    AST_NODE this = _this;
+    const VTABLE_TYPE_OF(ASTNode) *class = this->_vptr;
+    class->print(this, indent);
 }
 
-SYMBOL ast_get_sym(void *node /* AST_SYMBOL */)
+SYMBOL ast_get_sym(void *_this /* AST_SYMBOL */)
 {
-    ERROR_CHECK_TYPE(node, ASTSymbol);
-    const VTABLE_TYPE_OF(ASTSymbol) *class = node;
-    return class->get_sym(node);
+    ERROR_CHECK_TYPE(_this, ASTSymbol);
+    AST_SYMBOL this = _this;
+    const VTABLE_TYPE_OF(ASTSymbol) *class = this->_vptr;
+    return class->get_sym(this);
 }
 
-CLASS_SYMBOL_TYPE ast_get_class_sym(void *node /* AST_CLASS_SYMBOL */)
+CLASS_SYMBOL_TYPE ast_get_class_sym(void *_this /* AST_CLASS_SYMBOL */)
 {
-    ERROR_CHECK_TYPE(node, ASTClassSymbol);
-    const VTABLE_TYPE_OF(ASTClassSymbol) *class = node;
-    return class->get_class_sym(node);
+    ERROR_CHECK_TYPE(_this, ASTClassSymbol);
+    AST_CLASS_SYMBOL this = _this;
+    const VTABLE_TYPE_OF(ASTClassSymbol) *class = this->_vptr;
+    return class->get_class_sym(this);
 }
 
-AST_NODE ast_get_child(void *node /* AST_UNARY_OP */)
+AST_NODE ast_get_child(void *_this /* AST_UNARY_OP */)
 {
-    ERROR_CHECK_TYPE(node, ASTUnaryOp);
-    const VTABLE_TYPE_OF(ASTUnaryOp) *class = node;
-    return class->get_child(node);
+    ERROR_CHECK_TYPE(_this, ASTUnaryOp);
+    AST_UNARY_OP this = _this;
+    const VTABLE_TYPE_OF(ASTUnaryOp) *class = this->_vptr;
+    return class->get_child(this);
 }
 
-AST_NODE ast_get_left_child(void *node /* AST_BINARY_OP */)
+AST_NODE ast_get_left_child(void *_this /* AST_BINARY_OP */)
 {
-    ERROR_CHECK_TYPE(node, ASTBinaryOp);
-    const VTABLE_TYPE_OF(ASTBinaryOp) *class = node;
-    return class->get_left_child(node);
+    ERROR_CHECK_TYPE(_this, ASTBinaryOp);
+    AST_BINARY_OP this = _this;
+    const VTABLE_TYPE_OF(ASTBinaryOp) *class = this->_vptr;
+    return class->get_left_child(this);
 }
 
-AST_NODE ast_get_right_child(void *node /* AST_BINARY_OP */)
+AST_NODE ast_get_right_child(void *_this /* AST_BINARY_OP */)
 {
-    ERROR_CHECK_TYPE(node, ASTBinaryOp);
-    const VTABLE_TYPE_OF(ASTBinaryOp) *class = node;
-    return class->get_right_child(node);
+    ERROR_CHECK_TYPE(_this, ASTBinaryOp);
+    AST_BINARY_OP this = _this;
+    const VTABLE_TYPE_OF(ASTBinaryOp) *class = this->_vptr;
+    return class->get_right_child(this);
 }
 
-size_t ast_get_num_of_children(void *node /* AST_LIST */)
+size_t ast_get_num_of_children(void *_this /* AST_LIST */)
 {
-    ERROR_CHECK_TYPE(node, ASTList);
-    const VTABLE_TYPE_OF(ASTList) *class = node;
-    return class->get_num_of_children(node);
+    ERROR_CHECK_TYPE(_this, ASTList);
+    AST_LIST this = _this;
+    const VTABLE_TYPE_OF(ASTList) *class = this->_vptr;
+    return class->get_num_of_children(this);
 }
 
-AST_NODE * ast_get_children(void *node /* AST_LIST */)
+AST_NODE * ast_get_children(void *_this /* AST_LIST */)
 {
-    ERROR_CHECK_TYPE(node, ASTList);
-    const VTABLE_TYPE_OF(ASTList) *class = node;
-    return class->get_children(node);
+    ERROR_CHECK_TYPE(_this, ASTList);
+    AST_LIST this = _this;
+    const VTABLE_TYPE_OF(ASTList) *class = this->_vptr;
+    return class->get_children(this);
 }
 
-AST_NODE ast_get_nth_child(void *node /* AST_LIST */, size_t index)
+AST_NODE ast_get_nth_child(void *_this /* AST_LIST */, size_t index)
 {
-    ERROR_CHECK_TYPE(node, ASTList);
-    const VTABLE_TYPE_OF(ASTList) *class = node;
-    return class->get_nth_child(node, index);
+    ERROR_CHECK_TYPE(_this, ASTList);
+    AST_LIST this = _this;
+    const VTABLE_TYPE_OF(ASTList) *class = this->_vptr;
+    return class->get_nth_child(this, index);
 }
 
-size_t ast_get_lower_range(void *node /* AST_RANGE */)
+int ast_get_lower_range(void *_this /* AST_RANGE */)
 {
-    ERROR_CHECK_TYPE(node, ASTRange);
-    const VTABLE_TYPE_OF(ASTRange) *class = node;
-    return class->get_lower_range(node);
+    ERROR_CHECK_TYPE(_this, ASTRange);
+    AST_RANGE this = _this;
+    const VTABLE_TYPE_OF(ASTRange) *class = this->_vptr;
+    return class->get_lower_range(this);
 }
 
-size_t ast_get_upper_range(void *node /* AST_RANGE */)
+int ast_get_upper_range(void *_this /* AST_RANGE */)
 {
-    ERROR_CHECK_TYPE(node, ASTRange);
-    const VTABLE_TYPE_OF(ASTRange) *class = node;
-    return class->get_upper_range(node);
+    ERROR_CHECK_TYPE(_this, ASTRange);
+    AST_RANGE this = _this;
+    const VTABLE_TYPE_OF(ASTRange) *class = this->_vptr;
+    return class->get_upper_range(this);
 }
 
 // ------------------------------------------------------------------------ //
@@ -479,10 +520,11 @@ static SYMBOL ASTSymbol_get_sym(void *_this)
 
 static void ASTSymbol_print(void *_this, int index)
 {
-    //* STUB
-    (void) _this;
-    (void) index;
-    return;
+    AST_SYMBOL this = _this;
+    for (int i = 0; i < index; ++i)
+        printf(PRINT_INDENT);
+    if (isprint(this->sym)) printf("ASTSymbol[%c]\n", this->sym);
+    else printf("ASTSymbol[%d]\n", this->sym);
 }
 
 DEFINE_AST_VTABLE(ASTSymbol) = {
@@ -535,10 +577,24 @@ static CLASS_SYMBOL_TYPE ASTClassSymbol_get_class_sym(void *_this)
 
 static void ASTClassSymbol_print(void *_this, int index)
 {
-    //* STUB
-    (void) _this;
-    (void) index;
-    return;
+    AST_CLASS_SYMBOL this = _this;
+    for (int i = 0; i < index; ++i)
+        printf(PRINT_INDENT);
+    switch (this->class_sym)
+    {
+    case WHITESPACE:
+        printf("ASTClassSymbol[WHITESPACE]\n");
+        break;
+    case DIGIT:
+        printf("ASTClassSymbol[DIGIT]\n");
+        break;
+    case WORD:
+        printf("ASTClassSymbol[WORD]\n");
+        break;
+    default:
+        printf("ASTClassSymbol[UNKNOWN]\n");
+        break;
+    }
 }
 
 DEFINE_AST_VTABLE(ASTClassSymbol) = {
@@ -549,6 +605,7 @@ DEFINE_AST_VTABLE(ASTClassSymbol) = {
     .emit = ASTClassSymbol_emit,
     .isa  = ASTClassSymbol_isa,
     .get_class_sym = ASTClassSymbol_get_class_sym,
+    .print = ASTClassSymbol_print,
     .super = VPTR_TO(ASTNode),
     .type_name = "ASTClassSymbol"
 };
@@ -586,9 +643,18 @@ static AST_NODE ASTUnaryOp_get_child(void *_this)
 
 static void ASTUnaryOp_print(void *_this, int index)
 {
-    //* STUB
-    (void) _this;
-    (void) index;
+    AST_UNARY_OP this = _this;
+    for (int i = 0; i < index; ++i)
+        printf(PRINT_INDENT);
+    printf("ASTUnaryOp[UNKNOWN]\n");
+    if (this->child)
+        ast_print(this->child, index + 1);
+    else
+    {
+        for (int i = 0; i < index + 1; ++i)
+            printf(PRINT_INDENT);
+        printf("NULL\n");
+    }
 }
 
 DEFINE_AST_VTABLE(ASTUnaryOp) = {
@@ -629,9 +695,18 @@ static int ASTGroup_isa(void *other)
 
 static void ASTGroup_print(void *_this, int index)
 {
-    //* STUB
-    (void) _this;
-    (void) index;
+    AST_GROUP this = _this;
+    for (int i = 0; i < index; ++i)
+        printf(PRINT_INDENT);
+    printf("ASTUnaryOp[GROUP]\n");
+    if (this->child)
+        ast_print(this->child, index + 1);
+    else
+    {
+        for (int i = 0; i < index + 1; ++i)
+            printf(PRINT_INDENT);
+        printf("NULL\n");
+    }
 }
 
 DEFINE_AST_VTABLE(ASTGroup) = {
@@ -657,8 +732,8 @@ static void ASTRange_ctor(void *_this, va_list args)
 {
     AST_RANGE this = _this; 
     super(this)->ctor(this, args);
-    this->min = va_arg(args, size_t);
-    this->max = va_arg(args, size_t);
+    this->min = va_arg(args, int);
+    this->max = va_arg(args, int);
 }
 
 static NFA_COMPONENT ASTRange_emit(void *_this)
@@ -674,13 +749,13 @@ static int ASTRange_isa(void *other)
     return rtti == TYPE_ASTRange;
 }
 
-static size_t ASTRange_get_lower_range(void *_this)
+static int ASTRange_get_lower_range(void *_this)
 {
     AST_RANGE this = _this;
     return this->min;
 }
 
-static size_t ASTRange_get_upper_range(void *_this)
+static int ASTRange_get_upper_range(void *_this)
 {
     AST_RANGE this = _this;
     return this->max;
@@ -688,9 +763,18 @@ static size_t ASTRange_get_upper_range(void *_this)
 
 static void ASTRange_print(void *_this, int index)
 {
-    //* stub
-    (void) _this;
-    (void) index;
+    AST_RANGE this = _this;
+    for (int i = 0; i < index; ++i)
+        printf(PRINT_INDENT);
+    printf("ASTUnaryOp[RANGE(%d, %d)]\n", this->min, this->max);
+    if (this->child)
+        ast_print(this->child, index + 1);
+    else
+    {
+        for (int i = 0; i < index + 1; ++i)
+            printf(PRINT_INDENT);
+        printf("NULL\n");
+    }
 }
 
 DEFINE_AST_VTABLE(ASTRange) = {
@@ -755,9 +839,28 @@ static AST_NODE ASTBinaryOp_get_right_child(void *_this)
 
 static void ASTBinaryOp_print(void *_this, int index)
 {
-    //* STUB
-    (void) _this;
-    (void) index;
+    AST_BINARY_OP this = _this;
+    for (int i = 0; i < index; ++i)
+        printf(PRINT_INDENT);
+    printf("ASTBinaryOp[UNKNOWN]\n");
+
+    if (this->left_child)
+        ast_print(this->left_child, index + 1);
+    else
+    {
+        for (int i = 0; i < index + 1; ++i)
+            printf(PRINT_INDENT);
+        printf("NULL\n");
+    }
+
+    if (this->right_child)
+        ast_print(this->right_child, index + 1);
+    else
+    {
+        for (int i = 0; i < index + 1; ++i)
+            printf(PRINT_INDENT);
+        printf("NULL\n");
+    }
 }
 
 DEFINE_AST_VTABLE(ASTBinaryOp) = {
@@ -794,9 +897,28 @@ static int ASTConcat_isa(void *other)
 
 static void ASTConcat_print(void *_this, int index)
 {
-    //* STUB
-    (void) _this;
-    (void) index;
+    AST_CONCAT this = _this;
+    for (int i = 0; i < index; ++i)
+        printf(PRINT_INDENT);
+    printf("ASTBinaryOp[CONCAT]\n");
+
+    if (this->left_child)
+        ast_print(this->left_child, index + 1);
+    else
+    {
+        for (int i = 0; i < index + 1; ++i)
+            printf(PRINT_INDENT);
+        printf("NULL\n");
+    }
+
+    if (this->right_child)
+        ast_print(this->right_child, index + 1);
+    else
+    {
+        for (int i = 0; i < index + 1; ++i)
+            printf(PRINT_INDENT);
+        printf("NULL\n");
+    }
 }
 
 DEFINE_AST_VTABLE(ASTConcat) = {
@@ -833,9 +955,28 @@ static int ASTUnion_isa(void *other)
 
 static void ASTUnion_print(void *_this, int index)
 {
-    //* STUB
-    (void) _this;
-    (void) index;
+    AST_UNION this = _this;
+    for (int i = 0; i < index; ++i)
+        printf(PRINT_INDENT);
+    printf("ASTBinaryOp[UNION]\n");
+
+    if (this->left_child)
+        ast_print(this->left_child, index + 1);
+    else
+    {
+        for (int i = 0; i < index + 1; ++i)
+            printf(PRINT_INDENT);
+        printf("NULL\n");
+    }
+
+    if (this->right_child)
+        ast_print(this->right_child, index + 1);
+    else
+    {
+        for (int i = 0; i < index + 1; ++i)
+            printf(PRINT_INDENT);
+        printf("NULL\n");
+    }
 }
 
 DEFINE_AST_VTABLE(ASTUnion) = {
@@ -872,9 +1013,28 @@ static int ASTCharRange_isa(void *other)
 
 static void ASTCharRange_print(void *_this, int index)
 {
-    //* STUB
-    (void) _this;
-    (void) index;
+    AST_CHAR_RANGE this = _this;
+    for (int i = 0; i < index; ++i)
+        printf(PRINT_INDENT);
+    printf("ASTBinaryOp[CHARACTER_RANGE]\n");
+
+    if (this->left_child)
+        ast_print(this->left_child, index + 1);
+    else
+    {
+        for (int i = 0; i < index + 1; ++i)
+            printf(PRINT_INDENT);
+        printf("NULL\n");
+    }
+
+    if (this->right_child)
+        ast_print(this->right_child, index + 1);
+    else
+    {
+        for (int i = 0; i < index + 1; ++i)
+            printf(PRINT_INDENT);
+        printf("NULL\n");
+    }
 }
 
 DEFINE_AST_VTABLE(ASTCharRange) = {
@@ -942,9 +1102,22 @@ static AST_NODE ASTList_get_nth_child(void *_this, size_t index)
 
 static void ASTList_print(void *_this, int index)
 {
-    //* STUB
-    (void) _this;
-    (void) index;
+    AST_LIST this = _this;
+    for (int i = 0; i < index; ++i)
+        printf(PRINT_INDENT);
+    printf("ASTList[UNKNOWN]\n");
+
+    for (size_t i = 0; i < this->num_of_children; ++i)
+    {
+        if (this->children[i])
+            ast_print(this->children[i], index + 1);
+        else
+        {
+            for (int i = 0; i < index + 1; ++i)
+                printf(PRINT_INDENT);
+            printf("NULL\n");
+        }
+    }
 }
 
 DEFINE_AST_VTABLE(ASTList) = {
@@ -982,9 +1155,22 @@ static int ASTCharClass_isa(void *other)
 
 static void ASTCharClass_print(void *_this, int index)
 {
-    //* STUB
-    (void) _this;
-    (void) index;
+    AST_LIST this = _this;
+    for (int i = 0; i < index; ++i)
+        printf(PRINT_INDENT);
+    printf("ASTList[CharClass]\n");
+
+    for (size_t i = 0; i < this->num_of_children; ++i)
+    {
+        if (this->children[i])
+            ast_print(this->children[i], index + 1);
+        else
+        {
+            for (int i = 0; i < index + 1; ++i)
+                printf(PRINT_INDENT);
+            printf("NULL\n");
+        }
+    }
 }
 
 DEFINE_AST_VTABLE(ASTCharClass) = {

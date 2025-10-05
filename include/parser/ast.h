@@ -47,8 +47,8 @@
                                                           ┌─────────────┸────────────┐   ┌───────┸───────┐           ┌────────┸───────┐ ┌────────┸──────┐ ┌─────────┸──────────┐                 ┌─────────┸──────────┐
                                                           │ [C] ASTRange             │   │ [C] ASTGroup  │           │ [C] ASTConcat  │ │ [C] ASTUnion  │ │ [C] ASTCharRange   │                 │ [C] ASTCharClass   |
                                                           ├──────────────────────────┤   └───────────────┘           └────────────────┘ └───────────────┘ └────────────────────┘                 └────────────────────┘
-                                                          │+ size_t get_lower_range()│
-                                                          |+ size_t get_upper_range()|
+                                                          │+ int get_lower_range()   │
+                                                          |+ int get_upper_range()   |
                                                           └──────────────────────────┘
  */
 
@@ -67,37 +67,37 @@ typedef struct ASTCharRange     *AST_CHAR_RANGE;
 typedef struct ASTList          *AST_LIST;
 typedef struct ASTCharClass     *AST_CHAR_CLASS;
 
-void *ast_new(void *_class, ...);
+void *ast_new(const void *_class, ...);
 
-void ast_delete(void *node /* AST_NODE */);
+void ast_delete(void *_this /* AST_NODE */);
 
-int ast_isa(void *node /* AST_NODE */, const void *_class);
+int ast_isa(void *_this /* AST_NODE */, const void *_class);
 
 #define ast_typeof(node) ((node)->_vptr)
 
-NFA_COMPONENT ast_emit(void *node /* AST_NODE */);
+NFA_COMPONENT ast_emit(void *_this /* AST_NODE */);
 
-void ast_print(void *node /* AST_NODE */ , int indent);
+void ast_print(void *_this /* AST_NODE */ , int indent);
 
-SYMBOL ast_get_sym(void *node /* AST_SYMBOL */);
+SYMBOL ast_get_sym(void *_this /* AST_SYMBOL */);
 
-CLASS_SYMBOL_TYPE ast_get_class_sym(void *node /* AST_CLASS_SYMBOL */); 
+CLASS_SYMBOL_TYPE ast_get_class_sym(void *_this /* AST_CLASS_SYMBOL */); 
 
-AST_NODE ast_get_child(void *node /* AST_UNARY_OP */);
+AST_NODE ast_get_child(void *_this /* AST_UNARY_OP */);
 
-AST_NODE ast_get_left_child(void *node /* AST_BINARY_OP */);
+AST_NODE ast_get_left_child(void *_this /* AST_BINARY_OP */);
 
-AST_NODE ast_get_right_child(void *node /* AST_BINARY_OP */);
+AST_NODE ast_get_right_child(void *_this /* AST_BINARY_OP */);
 
-size_t ast_get_num_of_children(void *node /* AST_LIST */);
+size_t ast_get_num_of_children(void *_this /* AST_LIST */);
 
-AST_NODE * ast_get_children(void *node /* AST_LIST */);
+AST_NODE * ast_get_children(void *_this /* AST_LIST */);
 
-AST_NODE ast_get_nth_child(void *node /* AST_LIST */, size_t index);
+AST_NODE ast_get_nth_child(void *_this /* AST_LIST */, size_t index);
 
-size_t ast_get_lower_range(void *node /* AST_RANGE */);
+int ast_get_lower_range(void *_this /* AST_RANGE */);
 
-size_t ast_get_upper_range(void *node /* AST_RANGE */);
+int ast_get_upper_range(void *_this /* AST_RANGE */);
 
 // --------------------------------------------------------------------------------- //
 
