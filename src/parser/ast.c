@@ -566,8 +566,11 @@ static void ASTUnaryOp_ctor(void *_this, va_list args)
     this->child = va_arg(args, AST_NODE);
 }
 
-//* NOTE: We may want to destroy the child node in the destructor
-static void ASTUnaryOp_dtor(void *_this) {}
+static void ASTUnaryOp_dtor(void *_this) 
+{
+    AST_UNARY_OP this = _this;
+    ast_delete(this->child);
+}
 
 static int ASTUnaryOp_isa(void *other)
 {
@@ -718,8 +721,12 @@ static void ASTBinaryOp_ctor(void *_this, va_list args)
     this->right_child = va_arg(args, AST_NODE);
 }
 
-//* NOTE: We may want to destroy the children nodes in the destructor
-static void ASTBinaryOp_dtor(void *_this) {}
+static void ASTBinaryOp_dtor(void *_this) 
+{
+    AST_BINARY_OP this = _this;
+    ast_delete(this->left_child);
+    ast_delete(this->right_child);
+}
 
 static NFA_COMPONENT ASTBinaryOp_emit(void *_this)
 {
@@ -901,10 +908,11 @@ static void ASTList_ctor(void *_this, va_list args)
         this->children[i] = children[i];
 }
 
-//* NOTE: We may want to destroy the children nodes in the destructor
 static void ASTList_dtor(void *_this)
 {
     AST_LIST this = _this;
+    for (size_t i = 0; i < this->num_of_children; ++i)
+        ast_delete(this->children[i]);
     free(this->children);
 }
 
