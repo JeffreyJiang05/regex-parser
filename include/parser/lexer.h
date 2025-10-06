@@ -25,7 +25,7 @@ typedef enum token_type
     COMMA,
     UNION,
     MINUS,
-    END = -1
+    END
 } TOKEN_TYPE;
 
 typedef enum class_symbol
