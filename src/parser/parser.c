@@ -136,7 +136,7 @@ static void *parse_bracket_symbol_prime(LEXER lexer, CONTEXT ctx, AST_NODE lhs)
                 "Class symbol can not appear within another character class!"
             );
             lex_consume_until(lexer, RBRACKET, BASIC_SYMBOL, ESCAPED_SYMBOL);
-            return ast_new(ASTError);
+            return lhs;
         }
         case LBRACKET:
         {
@@ -147,7 +147,7 @@ static void *parse_bracket_symbol_prime(LEXER lexer, CONTEXT ctx, AST_NODE lhs)
                 "A character class can not be introduced within another character class!"
             );
             lex_consume_until(lexer, RBRACKET, BASIC_SYMBOL, ESCAPED_SYMBOL);
-            return ast_new(ASTError);
+            return lhs;
         }
         case MINUS:
         {
@@ -164,7 +164,7 @@ static void *parse_bracket_symbol_prime(LEXER lexer, CONTEXT ctx, AST_NODE lhs)
                 "Unexpected token within character class! Did you mean use to its escape character?"
             );
             lex_consume_until(lexer, RBRACKET, BASIC_SYMBOL, ESCAPED_SYMBOL);
-            return ast_new(ASTError);
+            return lhs;
         }
     }
 }
@@ -542,7 +542,7 @@ static void *parse_dup_term_prime(LEXER lexer, CONTEXT ctx, AST_NODE term)
                 "Unexpected token!"
             );
             lex_consume_until(lexer, LPAREN, RPAREN, UNION, LBRACKET, BASIC_SYMBOL, ESCAPED_SYMBOL, CLASS_SYMBOL);
-            return ast_new(ASTError);  
+            return term;  
         }
     }
 }

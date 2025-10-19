@@ -10,9 +10,9 @@
 
 int main()
 {
-    errlogs_install();
-    parser_parse("a{4,a}");
-    
-
+    // errlogs_install();
+    AST_NODE node = parser_parse("[a-z]]");
+    ast_print(node, 0);
+    ast_delete(node);
     return 0;
 }
