@@ -33,6 +33,9 @@ OBJF := $(foreach f, $(OBJF), $(call remove_slashes, $(f)))
 OBJF_COUNT := $(words $(OBJF))
 FUNCF := $(filter-out $(BUILD)main.o, $(OBJF))
 TESTF := $(shell find $(TEST) -type f -name *.c)
+TEST_OBJF := $(patsubst $(TEST)%, $(BUILD)%, $(TESTF:.c=.o))
+TEST_OBJF := $(foreach f, $(TEST_OBJF), $(call remove_slashes, $(f)))
+TEST_OBJF_COUNT := $(words $(TEST_OBJF))
 
 TEST_EXEC := $(EXEC)_tests
 
@@ -56,8 +59,8 @@ $(BUILD):
 $(BIN)$(EXEC): $(OBJF)
 	$(CC) $^ -o $@ $(LIBS)
 
-$(BIN)$(TEST_EXEC): $(FUNCF) $(TESTF)
-	$(CC) $(CFLAGS) $(INC) $(FUNCF) $(TESTF) $(TEST_LIBS) $(LIBS) -o $@
+$(BIN)$(TEST_EXEC): $(FUNCF) $(TEST_OBJF)
+	$(CC) $(CFLAGS) $(INC) $(FUNCF) $(TEST_OBJF) $(TEST_LIBS) $(LIBS) -o $@
 
 define BUILD_RECIPE_TEMPLATE
 $1: $2
@@ -65,6 +68,9 @@ $1: $2
 endef
 $(foreach i, $(shell seq $(OBJF_COUNT)), \
 		$(eval $(call BUILD_RECIPE_TEMPLATE, $(word $(i), $(OBJF)), $(word $(i), $(SRCF))) ))
+
+$(foreach i, $(shell seq $(TEST_OBJF_COUNT)), \
+		$(eval $(call BUILD_RECIPE_TEMPLATE, $(word $(i), $(TEST_OBJF)), $(word $(i), $(TESTF))) ))
 
 clean:
 	rm -rfv $(BUILD) $(BIN)
