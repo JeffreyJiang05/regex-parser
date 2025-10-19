@@ -27,6 +27,7 @@
  *           ASTCharClass
  * 
  * UML DIAGRAM FOR THE CLASS HEIRARCHY
+ * TODO: ADD TO ASTList, ast_add_child
                                                                                  ┌───────────────────────────────┐
                                                                                  │ [I] ASTNode                   │
                                                                                  ├───────────────────────────────┤
@@ -38,7 +39,7 @@
              ┇                                        ┎╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍╍┚  ┇                  ┌────────────────────────────┸─────────────────────────────┐   ┌────────────────────────┸───────────────────────┐
 ┌────────────┸──────────────┐  ┌──────────────────────┸──────────────────────┐   ┌───────────────┸──────────────┐   │ [A] ASTBinaryOp                                          │   │ [A] ASTList                                    │
 │ [C] ASTSymbol             │  │ [C] ASTClassSymbol                          │   │ [A] ASTUnaryOp               │   ├──────────────────────────────────────────────────────────┤   ├────────────────────────────────────────────────┤
-├───────────────────────────┤  ├─────────────────────────────────────────────┤   ├──────────────────────────────┤   │+ AST_BINARY_OP(AST_NODE left_child, AST_NODE right_child)│   │+ AST_LIST(size_t list_len, AST_NODE children[])│
+├───────────────────────────┤  ├─────────────────────────────────────────────┤   ├──────────────────────────────┤   │+ AST_BINARY_OP(AST_NODE left_child, AST_NODE right_child)│   │+ AST_LIST(size_t list_len, AST_NODE children..)│
 │+ AST_SYMBOL(SYMBOL symbol)│  │+ AST_META_SYMBOL(CLASS_SYMBOL_TYPE meta_sym)│   │+ AST_UNARY_OP(AST_NODE child)│   │+ AST_NODE get_left_child()                               │   │+ size_t get_num_of_children()                  │
 │+ SYMBOL get_sym()         │  │+ CLASS_SYMBOL_TYPE get_class_sym()          │   │+ AST_NODE get_child()        │   │+ AST_NODE get_right_child()                              │   │+ AST_NODE *get_children()                      │
 └───────────────────────────┘  └─────────────────────────────────────────────┘   └────────────┰──┰──────────────┘   └─────────┰──────────────────┰──────────────────┰──────────┘   │+ AST_NODE get_nth_child(size_t index)          │
@@ -55,6 +56,7 @@
 // DEFINE THE TYPES IN THE INHERITANCE TREE
 
 typedef struct ASTNode          *AST_NODE;
+typedef struct ASTError         *AST_ERROR;
 typedef struct ASTSymbol        *AST_SYMBOL;
 typedef struct ASTClassSymbol   *AST_CLASS_SYMBOL;
 typedef struct ASTUnaryOp       *AST_UNARY_OP;
@@ -67,37 +69,44 @@ typedef struct ASTCharRange     *AST_CHAR_RANGE;
 typedef struct ASTList          *AST_LIST;
 typedef struct ASTCharClass     *AST_CHAR_CLASS;
 
-void *ast_new(const void *_class, ...);
+typedef const void *CLASS; 
+#define PARAM(type) void *
 
-void ast_delete(void *_this /* AST_NODE */);
+void * ast_new(CLASS _class, ...);
 
-int ast_isa(void *_this /* AST_NODE */, const void *_class);
+void ast_delete(PARAM(ASTNode) _this);
+
+int ast_isa(PARAM(ASTNode) _this, CLASS _class);
 
 #define ast_typeof(node) ((node)->_vptr)
 
-NFA_COMPONENT ast_emit(void *_this /* AST_NODE */);
+NFA_COMPONENT ast_emit(PARAM(ASTNode) _this);
 
-void ast_print(void *_this /* AST_NODE */ , int indent);
+void ast_print(PARAM(ASTNode) _this , int indent);
 
-SYMBOL ast_get_sym(void *_this /* AST_SYMBOL */);
+int ast_equals(PARAM(ASTNode) _this, PARAM(ASTNode) other);
 
-CLASS_SYMBOL_TYPE ast_get_class_sym(void *_this /* AST_CLASS_SYMBOL */); 
+SYMBOL ast_get_sym(PARAM(ASTSymbol) _this);
 
-AST_NODE ast_get_child(void *_this /* AST_UNARY_OP */);
+CLASS_SYMBOL_TYPE ast_get_class_sym(PARAM(ASTClassSymbol) _this); 
 
-AST_NODE ast_get_left_child(void *_this /* AST_BINARY_OP */);
+AST_NODE ast_get_child(PARAM(ASTUnaryOp) _this);
 
-AST_NODE ast_get_right_child(void *_this /* AST_BINARY_OP */);
+AST_NODE ast_get_left_child(PARAM(ASTBinaryOp) _this);
 
-size_t ast_get_num_of_children(void *_this /* AST_LIST */);
+AST_NODE ast_get_right_child(PARAM(ASTBinaryOp) _this);
 
-AST_NODE * ast_get_children(void *_this /* AST_LIST */);
+size_t ast_get_num_of_children(PARAM(ASTList) _this);
 
-AST_NODE ast_get_nth_child(void *_this /* AST_LIST */, size_t index);
+AST_NODE * ast_get_children(PARAM(ASTList) _this);
 
-int ast_get_lower_range(void *_this /* AST_RANGE */);
+AST_NODE ast_get_nth_child(PARAM(ASTList) _this, size_t index);
 
-int ast_get_upper_range(void *_this /* AST_RANGE */);
+void ast_add_child(PARAM(ASTList) _this, PARAM(ASTNode) child);
+
+int ast_get_lower_range(PARAM(ASTRange) _this);
+
+int ast_get_upper_range(PARAM(ASTRange) _this);
 
 // --------------------------------------------------------------------------------- //
 
@@ -105,6 +114,7 @@ int ast_get_upper_range(void *_this /* AST_RANGE */);
 extern const struct type ## _VTABLE *type;
 
 DECLARE_AST_CLASS_HANDLER(ASTNode);
+DECLARE_AST_CLASS_HANDLER(ASTError);
 DECLARE_AST_CLASS_HANDLER(ASTSymbol);
 DECLARE_AST_CLASS_HANDLER(ASTClassSymbol);
 DECLARE_AST_CLASS_HANDLER(ASTUnaryOp);
@@ -118,6 +128,7 @@ DECLARE_AST_CLASS_HANDLER(ASTList);
 DECLARE_AST_CLASS_HANDLER(ASTCharClass);
 
 #define TYPEOF_ASTNode AST_NODE
+#define TYPEOF_ASTError AST_ERROR
 #define TYPEOF_ASTSymbol AST_SYMBOL
 #define TYPEOF_ASTClassSymbol AST_CLASS_SYMBOL
 #define TYPEOF_ASTUnaryOp AST_UNARY_OP

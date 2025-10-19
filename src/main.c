@@ -6,19 +6,13 @@
 #include "parser/lexer.h"
 
 #include "parser/ast.h"
+#include "parser/parser.h"
 
 int main()
 {
-    void *ast = ast_new(ASTConcat,
-        ast_new(ASTConcat, 
-            ast_new(ASTSymbol, 'a'),
-            ast_new(ASTSymbol, 'b')
-        ),
-        ast_new(ASTSymbol, 'c')
-    );
-
-    ast_print(ast, 0);
-    ast_delete(ast);
+    errlogs_install();
+    parser_parse("a{4,a}");
+    
 
     return 0;
 }

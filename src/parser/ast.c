@@ -15,6 +15,7 @@
 typedef enum
 {
     TYPE_ASTNode,
+        TYPE_ASTError,
         TYPE_ASTSymbol,
         TYPE_ASTClassSymbol,
         TYPE_ASTUnaryOp,
@@ -55,6 +56,12 @@ struct                                                      \
     int (*isa)(void *other);                                \
     NFA_COMPONENT (*emit)(void *_this);                     \
     void (*print)(void *_this, int);                        \
+    int (*equals)(void *_this, void *other);                \
+}
+
+#define ASTError_VTABLE_DECL                                \
+struct {                                                    \
+    EXTEND VTABLE FROM(ASTNode);                            \
 }
 
 #define ASTSymbol_VTABLE_DECL                               \
@@ -93,6 +100,7 @@ struct                                                      \
     size_t (*get_num_of_children)(void *_this);             \
     AST_NODE *(*get_children)(void *_this);                 \
     AST_NODE (*get_nth_child)(void *_this, size_t index);   \
+    void (*add_child)(void *_this, void *child);            \
 }
 
 #define ASTRange_VTABLE_DECL                                \
@@ -137,9 +145,10 @@ struct                                                      \
 struct type ## _VTABLE { VTABLE_DECL(type); const struct superclass ## _VTABLE *super; }
 
 #define DEFINE_AST_VTABLE_TYPE(type, superclass)                 \
-EVAL(DEFINE_AST_VTABLE_TYPE_HELPER(type, superclass))
+EVAL2(DEFINE_AST_VTABLE_TYPE_HELPER(type, superclass))
 
 DEFINE_AST_VTABLE_TYPE(ASTNode, void);
+DEFINE_AST_VTABLE_TYPE(ASTError, ASTNode);
 DEFINE_AST_VTABLE_TYPE(ASTSymbol, ASTNode);
 DEFINE_AST_VTABLE_TYPE(ASTClassSymbol, ASTNode);
 DEFINE_AST_VTABLE_TYPE(ASTUnaryOp, ASTNode);
@@ -165,6 +174,11 @@ DEFINE_AST_VTABLE_TYPE(ASTCharClass, ASTList);
 #define FROM ()()
 
 #define ASTNode_BODY struct {}
+
+#define ASTError_BODY struct            \
+{                                       \
+    INHERIT DATA FROM(ASTNode);         \
+}
 
 #define ASTSymbol_BODY                  \
 struct {                                \
@@ -223,6 +237,7 @@ struct {                                \
     INHERIT DATA FROM(ASTNode);         \
     AST_NODE *children;                 \
     size_t num_of_children;             \
+    size_t capacity;                    \
 }
 
 #define ASTCharClass_BODY               \
@@ -238,9 +253,10 @@ struct class                            \
 }
 
 // DEFINE THE DATA OF THE TYPES
-#define DEFINE_AST_TYPE(class) EVAL(DEFINE_AST_TYPE_HELPER(class))
+#define DEFINE_AST_TYPE(class) EVAL2(DEFINE_AST_TYPE_HELPER(class))
 
 DEFINE_AST_TYPE(ASTNode);
+DEFINE_AST_TYPE(ASTError);
 DEFINE_AST_TYPE(ASTSymbol);
 DEFINE_AST_TYPE(ASTClassSymbol);
 DEFINE_AST_TYPE(ASTUnaryOp);
@@ -311,10 +327,11 @@ do {                                                                            
 // to access the super class
 #define super(_this) ((_this)->_vptr->super)
 
-static AST_RTTI ast_get_rtti(void *class_type)
+static AST_RTTI ast_get_rtti(void *_this)
 {
+    AST_NODE this = _this;
     // zero cost abstraction
-    VTABLE_DECL(ASTNode) *base = class_type;
+    const VTABLE_TYPE_OF(ASTNode) *base = this->_vptr;
     return base->type;
 }
 
@@ -362,9 +379,8 @@ void ast_delete(void *_this /* AST_NODE */)
 
 int ast_isa(void *_this /* AST_NODE */, const void *_class)
 {
-    AST_NODE this = _this;
-    const VTABLE_TYPE_OF(ASTNode) *class = this->_vptr;
-    return class->isa(this);
+    const VTABLE_TYPE_OF(ASTNode) *class = _class;
+    return class->isa(_this);
 }
 
 NFA_COMPONENT ast_emit(void *_this /* AST_NODE */)
@@ -379,6 +395,13 @@ void ast_print(void *_this /* AST_NODE */ , int indent)
     AST_NODE this = _this;
     const VTABLE_TYPE_OF(ASTNode) *class = this->_vptr;
     class->print(this, indent);
+}
+
+int ast_equals(void *_this, void *other)
+{
+    AST_NODE this = _this; 
+    const VTABLE_TYPE_OF(ASTNode) *class = this->_vptr;
+    return class->equals(this, other);
 }
 
 SYMBOL ast_get_sym(void *_this /* AST_SYMBOL */)
@@ -445,6 +468,14 @@ AST_NODE ast_get_nth_child(void *_this /* AST_LIST */, size_t index)
     return class->get_nth_child(this, index);
 }
 
+void ast_add_child(void *_this /* AST_LIST */, void *child /* AST_NODE */)
+{
+    ERROR_CHECK_TYPE(_this, ASTList);
+    AST_LIST this = _this;
+    const VTABLE_TYPE_OF(ASTList) *class = this->_vptr;
+    class->add_child(this, child);
+}
+
 int ast_get_lower_range(void *_this /* AST_RANGE */)
 {
     ERROR_CHECK_TYPE(_this, ASTRange);
@@ -480,10 +511,59 @@ DEFINE_AST_VTABLE(ASTNode) = {
     .emit  = NULL,
     .isa   = ASTNode_isa,
     .print = NULL,
+    .equals = NULL,
     .super = NULL,
     .type_name = "ASTNode"
 };
 DEFINE_AST_CLASS_HANDLER(ASTNode);
+
+// ------------------------------------------------------------------------ //
+// IMPLEMENTING ASTError METHODS                                            //
+// This is an interface meaning no methods are defined                      //
+// ------------------------------------------------------------------------ //
+
+static void ASTError_ctor(void *_this, va_list args) {}
+
+static void ASTError_dtor(void *_this) {}
+
+static NFA_COMPONENT ASTError_emit(void *_this)
+{
+    fprintf(stderr, "Should not be generating NFA from invalid AST Tree! Terminating.");
+    raise(SIGTERM);
+    return NULL;
+}
+
+static int ASTError_isa(void *other)
+{
+    AST_RTTI rtti = ast_get_rtti(other);
+    return rtti == RTTI(ASTError);
+}
+
+static void ASTError_print(void *_this, int index)
+{
+    for (int i = 0; i < index; ++i)
+        printf(PRINT_INDENT);
+    printf("ASTError[!]\n");
+}
+
+static int ASTError_equals(void *_this, void *_other)
+{
+    return ast_isa(_other, ASTError);
+}
+
+DEFINE_AST_VTABLE(ASTError) = {
+    .type = RTTI(ASTError),
+    .size = sizeof(struct ASTError),
+    .ctor = ASTError_ctor,
+    .dtor = ASTError_dtor,
+    .emit = ASTError_emit,
+    .isa  = ASTError_isa,
+    .print = ASTError_print,
+    .equals = ASTError_equals,
+    .super = VPTR_TO(ASTNode),
+    .type_name = "ASTError"
+};
+DEFINE_AST_CLASS_HANDLER(ASTError);
 
 // ------------------------------------------------------------------------ //
 // IMPLEMENTING ASTSymbol METHODS                                           //
@@ -527,6 +607,17 @@ static void ASTSymbol_print(void *_this, int index)
     else printf("ASTSymbol[%d]\n", this->sym);
 }
 
+static int ASTSymbol_equals(void *_this, void *_other)
+{
+    AST_SYMBOL this = _this;
+    if (ast_isa(_other, ASTSymbol))
+    {
+        AST_SYMBOL other = _other;
+        return this->sym == other->sym;
+    }
+    return 0;
+}
+
 DEFINE_AST_VTABLE(ASTSymbol) = {
     .type    = RTTI(ASTSymbol),
     .size    = sizeof(struct ASTSymbol),
@@ -536,6 +627,7 @@ DEFINE_AST_VTABLE(ASTSymbol) = {
     .isa     = ASTSymbol_isa,
     .get_sym = ASTSymbol_get_sym,
     .print   = ASTSymbol_print,
+    .equals  = ASTSymbol_equals,
     .super   = VPTR_TO(ASTNode),
     .type_name = "ASTSymbol"
 };
@@ -597,6 +689,17 @@ static void ASTClassSymbol_print(void *_this, int index)
     }
 }
 
+static int ASTClassSymbol_equals(void *_this, void *_other)
+{
+    AST_CLASS_SYMBOL this = _this;
+    if (ast_isa(_other, ASTClassSymbol))
+    {
+        AST_CLASS_SYMBOL other = _other;
+        return this->class_sym == other->class_sym;
+    }
+    return 0;
+}
+
 DEFINE_AST_VTABLE(ASTClassSymbol) = {
     .type = RTTI(ASTClassSymbol),
     .size = sizeof(struct ASTClassSymbol),
@@ -606,6 +709,7 @@ DEFINE_AST_VTABLE(ASTClassSymbol) = {
     .isa  = ASTClassSymbol_isa,
     .get_class_sym = ASTClassSymbol_get_class_sym,
     .print = ASTClassSymbol_print,
+    .equals = ASTClassSymbol_equals,
     .super = VPTR_TO(ASTNode),
     .type_name = "ASTClassSymbol"
 };
@@ -657,6 +761,17 @@ static void ASTUnaryOp_print(void *_this, int index)
     }
 }
 
+static int ASTUnaryOp_equals(void *_this, void *_other)
+{
+    AST_UNARY_OP this = _this;
+    if (ast_isa(_other, ASTUnaryOp))
+    {
+        AST_UNARY_OP other = _other;
+        return ast_equals(this->child, other->child);
+    }
+    return 0;
+}
+
 DEFINE_AST_VTABLE(ASTUnaryOp) = {
     .type = RTTI(ASTUnaryOp),
     .size = sizeof(struct ASTUnaryOp),
@@ -665,6 +780,8 @@ DEFINE_AST_VTABLE(ASTUnaryOp) = {
     .emit = NULL,
     .isa = ASTUnaryOp_isa,
     .get_child = ASTUnaryOp_get_child,
+    .print = ASTUnaryOp_print,
+    .equals = ASTUnaryOp_equals,
     .super = VPTR_TO(ASTNode),
     .type_name = "ASTUnaryOp"
 };
@@ -709,6 +826,18 @@ static void ASTGroup_print(void *_this, int index)
     }
 }
 
+static int ASTGroup_equals(void *_this, void *_other)
+{
+    AST_GROUP this = _this;
+    if (ast_isa(_other, ASTGroup))
+    {
+        AST_GROUP other = _other;
+        return ast_equals(this->child, other->child);
+    }
+    return 0;
+}
+
+
 DEFINE_AST_VTABLE(ASTGroup) = {
     .type = RTTI(ASTGroup),
     .size = sizeof(struct ASTGroup),
@@ -718,6 +847,7 @@ DEFINE_AST_VTABLE(ASTGroup) = {
     .isa = ASTGroup_isa,
     .get_child = ASTUnaryOp_get_child,
     .print = ASTGroup_print,
+    .equals = ASTGroup_equals,
     .super = VPTR_TO(ASTUnaryOp),
     .type_name = "ASTGroup"
 };
@@ -777,6 +907,19 @@ static void ASTRange_print(void *_this, int index)
     }
 }
 
+static int ASTRange_equals(void *_this, void *_other)
+{
+    AST_RANGE this = _this;
+    if (ast_isa(_other, ASTRange))
+    {
+        AST_RANGE other = _other;
+        return this->min == other->min 
+            && this->max == other->max
+            && ast_equals(this->child, other->child);
+    }
+    return 0;
+}
+
 DEFINE_AST_VTABLE(ASTRange) = {
     .type = RTTI(ASTRange),
     .size = sizeof(struct ASTRange),
@@ -788,6 +931,7 @@ DEFINE_AST_VTABLE(ASTRange) = {
     .get_lower_range = ASTRange_get_lower_range,
     .get_upper_range = ASTRange_get_upper_range,
     .print = ASTRange_print,
+    .equals = ASTRange_equals,
     .super = VPTR_TO(ASTUnaryOp),
     .type_name = "ASTRange"
 };
@@ -863,6 +1007,18 @@ static void ASTBinaryOp_print(void *_this, int index)
     }
 }
 
+static int ASTBinaryOp_equals(void *_this, void *_other)
+{
+    AST_BINARY_OP this = _this;
+    if (ast_isa(_other, ASTBinaryOp))
+    {
+        AST_BINARY_OP other = _other;
+        return ast_equals(this->left_child, other->left_child)
+            && ast_equals(this->right_child, other->right_child);
+    }
+    return 0;
+}
+
 DEFINE_AST_VTABLE(ASTBinaryOp) = {
     .type = RTTI(ASTBinaryOp),
     .size = sizeof(struct ASTBinaryOp),
@@ -873,6 +1029,7 @@ DEFINE_AST_VTABLE(ASTBinaryOp) = {
     .get_left_child = ASTBinaryOp_get_left_child,
     .get_right_child = ASTBinaryOp_get_right_child,
     .print = ASTBinaryOp_print,
+    .equals = ASTBinaryOp_equals,
     .super = VPTR_TO(ASTNode),
     .type_name = "ASTBinaryOp"
 };
@@ -921,6 +1078,18 @@ static void ASTConcat_print(void *_this, int index)
     }
 }
 
+static int ASTConcat_equals(void *_this, void *_other)
+{
+    AST_CONCAT this = _this;
+    if (ast_isa(_other, ASTConcat))
+    {
+        AST_CONCAT other = _other;
+        return ast_equals(this->left_child, other->left_child)
+            && ast_equals(this->right_child, other->right_child);
+    }
+    return 0;
+}
+
 DEFINE_AST_VTABLE(ASTConcat) = {
     .type = RTTI(ASTConcat),
     .size = sizeof(struct ASTConcat),
@@ -931,6 +1100,7 @@ DEFINE_AST_VTABLE(ASTConcat) = {
     .get_left_child = ASTBinaryOp_get_left_child,
     .get_right_child = ASTBinaryOp_get_right_child,
     .print = ASTConcat_print,
+    .equals = ASTConcat_equals,
     .super = VPTR_TO(ASTBinaryOp),
     .type_name = "ASTConcat"
 };
@@ -979,6 +1149,18 @@ static void ASTUnion_print(void *_this, int index)
     }
 }
 
+static int ASTUnion_equals(void *_this, void *_other)
+{
+    AST_UNION this = _this;
+    if (ast_isa(_other, ASTUnion))
+    {
+        AST_UNION other = _other;
+        return ast_equals(this->left_child, other->left_child)
+            && ast_equals(this->right_child, other->right_child);
+    }
+    return 0;
+}
+
 DEFINE_AST_VTABLE(ASTUnion) = {
     .type = RTTI(ASTUnion),
     .size = sizeof(struct ASTUnion),
@@ -989,6 +1171,7 @@ DEFINE_AST_VTABLE(ASTUnion) = {
     .get_left_child = ASTBinaryOp_get_left_child,
     .get_right_child = ASTBinaryOp_get_right_child,
     .print = ASTUnion_print,
+    .equals = ASTUnion_equals,
     .super = VPTR_TO(ASTBinaryOp),
     .type_name = "ASTUnion"
 };
@@ -1037,6 +1220,18 @@ static void ASTCharRange_print(void *_this, int index)
     }
 }
 
+static int ASTCharRange_equals(void *_this, void *_other)
+{
+    AST_CHAR_RANGE this = _this;
+    if (ast_isa(_other, ASTCharRange))
+    {
+        AST_CHAR_RANGE other = _other;
+        return ast_equals(this->left_child, other->left_child)
+            && ast_equals(this->right_child, other->right_child);
+    }
+    return 0;
+}
+
 DEFINE_AST_VTABLE(ASTCharRange) = {
     .type = RTTI(ASTCharRange),
     .size = sizeof(struct ASTCharRange),
@@ -1047,6 +1242,7 @@ DEFINE_AST_VTABLE(ASTCharRange) = {
     .get_left_child = ASTBinaryOp_get_left_child,
     .get_right_child = ASTBinaryOp_get_right_child,
     .print = ASTCharRange_print,
+    .equals = ASTCharRange_equals,
     .super = VPTR_TO(ASTBinaryOp),
     .type_name = "ASTCharRange"
 };
@@ -1060,12 +1256,12 @@ DEFINE_AST_CLASS_HANDLER(ASTCharRange);
 static void ASTList_ctor(void *_this, va_list args)
 {
     AST_LIST this = _this;
-    size_t len = va_arg(args, size_t);
-    AST_NODE *children = va_arg(args, AST_NODE *);
+    size_t len = (size_t) va_arg(args, int);
     this->num_of_children = len;
-    this->children = malloc(len * sizeof(AST_NODE));
+    this->capacity = len == 0 ? 1 : len;
+    this->children = malloc(this->capacity * sizeof(AST_NODE));
     for (size_t i = 0; i < len; ++i)
-        this->children[i] = children[i];
+        this->children[i] = va_arg(args, AST_NODE);
 }
 
 static void ASTList_dtor(void *_this)
@@ -1100,6 +1296,20 @@ static AST_NODE ASTList_get_nth_child(void *_this, size_t index)
     return this->children[index];
 }
 
+static void ASTList_resize(void *_this)
+{
+    AST_LIST this = _this;
+    this->capacity *= 2;
+    this->children = realloc(this->children, this->capacity * sizeof(AST_NODE));
+}
+
+static void ASTList_add_child(void *_this, void *child)
+{
+    AST_LIST this = _this;
+    if (this->num_of_children == this->capacity) ASTList_resize(this);
+    this->children[this->num_of_children++] = child;
+}
+
 static void ASTList_print(void *_this, int index)
 {
     AST_LIST this = _this;
@@ -1120,6 +1330,23 @@ static void ASTList_print(void *_this, int index)
     }
 }
 
+static int ASTList_equals(void *_this, void *_other)
+{
+    AST_LIST this = _this;
+    if (ast_isa(_other, ASTList))
+    {
+        AST_LIST other = _other;
+        if (this->num_of_children != other->num_of_children) return 0;
+        for (size_t i = 0; i < this->num_of_children; ++i)
+        {
+            if (!ast_equals(this->children[i], other->children[i]))
+                return 0;
+        }
+        return 1;
+    }
+    return 0;
+}
+
 DEFINE_AST_VTABLE(ASTList) = {
     .type = RTTI(ASTList),
     .size = sizeof(struct ASTList),
@@ -1130,7 +1357,9 @@ DEFINE_AST_VTABLE(ASTList) = {
     .get_num_of_children = ASTList_get_num_of_children,
     .get_children = ASTList_get_children,
     .get_nth_child = ASTList_get_nth_child,
+    .add_child = ASTList_add_child,
     .print = ASTList_print,
+    .equals = ASTList_equals,
     .super = VPTR_TO(ASTNode),
     .type_name = "ASTList"
 };
@@ -1173,6 +1402,23 @@ static void ASTCharClass_print(void *_this, int index)
     }
 }
 
+static int ASTCharClass_equals(void *_this, void *_other)
+{
+    AST_CHAR_CLASS this = _this;
+    if (ast_isa(_other, ASTCharClass))
+    {
+        AST_CHAR_CLASS other = _other;
+        if (this->num_of_children != other->num_of_children) return 0;
+        for (size_t i = 0; i < this->num_of_children; ++i)
+        {
+            if (!ast_equals(this->children[i], other->children[i]))
+                return 0;
+        }
+        return 1;
+    }
+    return 0;
+}
+
 DEFINE_AST_VTABLE(ASTCharClass) = {
     .type = RTTI(ASTCharClass),
     .size = sizeof(struct ASTCharClass),
@@ -1183,7 +1429,9 @@ DEFINE_AST_VTABLE(ASTCharClass) = {
     .get_num_of_children = ASTList_get_num_of_children,
     .get_children = ASTList_get_children,
     .get_nth_child = ASTList_get_nth_child,
+    .add_child = ASTList_add_child,
     .print = ASTCharClass_print,
+    .equals = ASTCharClass_equals,
     .super = VPTR_TO(ASTList),
     .type_name = "ASTCharClass"
 };
